@@ -48,6 +48,14 @@ def test_analyze_document_drops_info_level_missing_signatures(sample_pdf):
         evidence="SIGNED for the Company",
         confidence=0.9,
     )
+    noise_medium = ExtractedFinding(
+        category="missing signatures",
+        title="Signatures present",
+        summary="Both parties have signed the agreement.",
+        severity="medium",
+        evidence="SIGNED for the Company",
+        confidence=0.9,
+    )
     real = ExtractedFinding(
         category="missing signatures",
         title="Blank signature block",
@@ -56,7 +64,7 @@ def test_analyze_document_drops_info_level_missing_signatures(sample_pdf):
         evidence="Signature: ____________",
         confidence=0.9,
     )
-    provider = FakeProvider(chunk_findings=[noise, real])
+    provider = FakeProvider(chunk_findings=[noise, noise_medium, real])
     document = load_document(sample_pdf)
     findings, _ = analyze_document(document, provider, ReviewConfig(), "contract.pdf")
     assert [f.title for f in findings] == ["Blank signature block"] * len(findings)

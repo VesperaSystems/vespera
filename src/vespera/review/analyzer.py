@@ -1,6 +1,7 @@
 """Chunking and per-document / cross-document analysis."""
 
 import json
+import re
 from dataclasses import dataclass
 
 from vespera.config import ReviewConfig
@@ -19,6 +20,26 @@ from vespera.review.models import (
 class Chunk:
     text: str
     start_page: int | None
+
+
+# small local models like to report "signatures present" as a "missing signatures"
+# finding despite instructions; a signature finding that affirms completeness is noise
+_POSITIVE_SIGNATURE_NOTE = re.compile(
+    r"signatures? (are |is )?present"
+    r"|(is|are|been|was|were|parties)( duly| fully)? signed"
+    r"|fully executed|duly executed"
+    r"|signature (blocks?|areas?) (is|are) complete"
+    r"|(both|all) parties (have |has )?signed",
+    re.IGNORECASE,
+)
+
+
+def _is_noise(finding) -> bool:
+    if finding.category != "missing signatures":
+        return False
+    if finding.severity == "info":
+        return True
+    return bool(_POSITIVE_SIGNATURE_NOTE.search(f"{finding.title} {finding.summary}"))
 
 
 def chunk_document(document: Document, chunk_chars: int, overlap_chars: int = 0) -> list[Chunk]:
@@ -62,10 +83,7 @@ def analyze_document(
         )
         result = provider.generate_structured(prompt, ChunkFindings)
         for extracted in result.findings:
-            # small local models like to report "signatures present" as an info-level
-            # "missing signatures" finding despite instructions; a real missing
-            # signature is always medium/high per the prompt's severity guide
-            if extracted.category == "missing signatures" and extracted.severity == "info":
+            if _is_noise(extracted):
                 continue
             findings.append(
                 Finding(
