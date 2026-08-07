@@ -1,8 +1,17 @@
 import json
 from pathlib import Path
 
-from vespera.review.models import Finding
+from vespera.deal import DealAnalysis
+from vespera.review.models import (
+    Finding,
+    KeyMetric,
+    ReadinessScore,
+    ThesisFit,
+    ThesisPoint,
+    ValuationResult,
+)
 from vespera.review.report import render_markdown, write_outputs
+from vespera.review.risks import risk_matrix
 
 FINDINGS = [
     Finding(
@@ -27,34 +36,108 @@ FINDINGS = [
     ),
 ]
 
+METRIC = KeyMetric(
+    name="arr",
+    value_text="£9.6 million",
+    amount=9.6,
+    unit="GBP",
+    period="FY2025",
+    source_file="financials.pdf",
+    source_page=1,
+    evidence="ARR basis was £9.6 million",
+)
 
-def test_report_contains_required_sections():
-    markdown = render_markdown(FINDINGS, ["msa.pdf", "nda.txt"])
+VALUATION = ValuationResult(
+    basis_metric="arr",
+    basis_amount_millions=9.6,
+    currency="GBP",
+    multiple_low=4.0,
+    multiple_base=6.0,
+    multiple_high=8.0,
+    value_low_millions=38.4,
+    value_base_millions=57.6,
+    value_high_millions=76.8,
+    sector="B2B software",
+    assumptions=["Growth persists"],
+    confidence=0.6,
+    caveats=["Churn unknown"],
+)
+
+
+def make_analysis(**overrides) -> DealAnalysis:
+    base = dict(
+        documents=["msa.pdf", "financials.pdf"],
+        empty_documents=[],
+        metrics=[METRIC],
+        findings=FINDINGS,
+        risk_matrix=risk_matrix(FINDINGS),
+        score=ReadinessScore(score=72, label="Strong reading", rationale="Mostly clean."),
+        thesis_fit=ThesisFit(
+            score=61,
+            aligned=[ThesisPoint(point="ARR above £5m", evidence="financials.pdf")],
+            conflicts=[ThesisPoint(point="IP not owned outright", evidence="contract 03")],
+            unknowns=["Cap table quality"],
+        ),
+        valuation=VALUATION,
+    )
+    base.update(overrides)
+    return DealAnalysis(**base)
+
+
+def test_report_contains_all_sections():
+    markdown = render_markdown(make_analysis())
     for section in [
-        "# Vespera Due Diligence Review",
+        "# Vespera Deal Review",
+        "Deal readiness: 72/100 — Strong reading",
         "## Executive Summary",
+        "## Key Metrics",
+        "## Thesis Fit",
+        "## Indicative Valuation",
+        "## Risk Overview",
+        "## Contradictions & Cross-Document Checks",
         "## High Priority Findings",
         "## Findings by Category",
         "## Documents Reviewed",
         "## Limitations",
     ]:
         assert section in markdown
-    assert "not" in markdown and "legal" in markdown  # disclaimer present
     assert "automated document triage" in markdown
-    assert "msa.pdf, p. 1" in markdown
-    assert "`nda.txt`" in markdown
+    assert "not an appraisal" in markdown
 
 
-def test_report_counts():
-    markdown = render_markdown(FINDINGS, ["msa.pdf"])
-    assert "**2 findings**" in markdown
-    assert "1 high" in markdown
+def test_metrics_table_cites_sources():
+    markdown = render_markdown(make_analysis())
+    assert "| Arr | £9.6 million | FY2025 | `financials.pdf, p. 1` |" in markdown
+
+
+def test_valuation_section_shows_range_and_assumptions():
+    markdown = render_markdown(make_analysis())
+    assert "£38.4m – £76.8m" in markdown
+    assert "base £57.6m" in markdown
+    assert "- Growth persists" in markdown
+    assert "- Churn unknown" in markdown
+
+
+def test_thesis_section_absent_without_thesis():
+    markdown = render_markdown(make_analysis(thesis_fit=None))
+    assert "## Thesis Fit" not in markdown
+
+
+def test_valuation_absent_without_metrics():
+    markdown = render_markdown(make_analysis(metrics=[], valuation=None))
+    assert "## Indicative Valuation" not in markdown
+
+
+def test_insufficient_data_message_with_metrics_but_no_valuation():
+    markdown = render_markdown(make_analysis(valuation=None))
+    assert "Insufficient financial data" in markdown
 
 
 def test_write_outputs(tmp_path: Path):
-    report_path, findings_path = write_outputs(FINDINGS, ["msa.pdf"], tmp_path / "out")
-    assert report_path.exists() and findings_path.exists()
-    data = json.loads(findings_path.read_text())
-    assert len(data) == 2
-    assert data[0]["category"] == "change-of-control clauses"
-    assert data[0]["source_page"] == 1
+    report_path, findings_path, deal_path = write_outputs(make_analysis(), tmp_path / "out")
+    assert report_path.exists() and findings_path.exists() and deal_path.exists()
+    findings = json.loads(findings_path.read_text())
+    assert len(findings) == 2
+    deal = json.loads(deal_path.read_text())
+    assert deal["score"]["score"] == 72
+    assert deal["valuation"]["value_base_millions"] == 57.6

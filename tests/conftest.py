@@ -3,16 +3,36 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from vespera.review.models import ChunkFindings, CrossDocumentFindings, DocumentSummary
+from vespera.review.models import (
+    ChunkFindings,
+    CriterionAssessment,
+    CrossDocumentFindings,
+    DocumentSummary,
+    ExtractedMetrics,
+    MultipleProposal,
+    ScoreRationale,
+    ThesisAssessment,
+)
 
 
 class FakeProvider:
     """LLMProvider stand-in that returns canned responses, no network."""
 
-    def __init__(self, chunk_findings=None, summary=None, cross_findings=None):
+    def __init__(
+        self,
+        chunk_findings=None,
+        summary=None,
+        cross_findings=None,
+        metrics=None,
+        thesis_assessment=None,
+        multiple_proposal=None,
+    ):
         self.chunk_findings = chunk_findings or []
         self.summary = summary
         self.cross_findings = cross_findings or []
+        self.metrics = metrics or []
+        self.thesis_assessment = thesis_assessment
+        self.multiple_proposal = multiple_proposal
         self.prompts: list[str] = []
 
     def generate_structured(self, prompt, schema):
@@ -25,6 +45,30 @@ class FakeProvider:
             return self.summary
         if schema is CrossDocumentFindings:
             return CrossDocumentFindings(findings=self.cross_findings)
+        if schema is ExtractedMetrics:
+            return ExtractedMetrics(metrics=self.metrics)
+        if schema is ScoreRationale:
+            return ScoreRationale(rationale="Signals are mixed; see findings.")
+        if schema is ThesisAssessment:
+            return self.thesis_assessment or ThesisAssessment(
+                assessments=[
+                    CriterionAssessment(
+                        criterion="ARR scale", verdict="aligned", evidence="financials"
+                    )
+                ]
+            )
+        if schema is MultipleProposal:
+            if self.multiple_proposal is None:
+                return MultipleProposal(
+                    basis="arr",
+                    multiple_low=4.0,
+                    multiple_base=6.0,
+                    multiple_high=8.0,
+                    sector="B2B software",
+                    assumptions=["test assumption"],
+                    confidence=0.6,
+                )
+            return self.multiple_proposal
         raise AssertionError(f"unexpected schema {schema}")
 
 

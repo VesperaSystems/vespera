@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "vespera"
-version = "0.1.0"
-description = "Local-first AI due diligence. Review a dataroom without sending confidential documents to a third-party AI provider."
+version = "0.2.0"
+description = "Local-first AI deal analysis and due diligence. Read a dataroom, cross-check its claims, score it against your thesis — without documents leaving your machine."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]

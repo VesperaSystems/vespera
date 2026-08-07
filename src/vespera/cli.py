@@ -17,11 +17,9 @@ from rich.progress import (
 
 import vespera
 from vespera.config import DEFAULT_MODEL, DEFAULT_OLLAMA_HOST, RECOMMENDED_MODELS, ReviewConfig
-from vespera.documents.loader import discover_documents, load_document
+from vespera.deal import analyze_dataroom
+from vespera.documents.loader import discover_documents
 from vespera.llm.ollama import OllamaError, OllamaProvider
-from vespera.review.aggregator import aggregate_findings
-from vespera.review.analyzer import analyze_document, cross_document_findings
-from vespera.review.models import DocumentSummary, Finding
 from vespera.review.report import write_outputs
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
@@ -86,11 +84,15 @@ def main(
 @app.command()
 def review(
     path: Path = typer.Argument(..., exists=True, file_okay=False, help="Dataroom directory."),
+    thesis: Path = typer.Option(
+        None, "--thesis", "-t", exists=True, dir_okay=False,
+        help="Your investment thesis (.md/.txt) to score the deal against.",
+    ),
     model: str = typer.Option(DEFAULT_MODEL, "--model", "-m", help="Ollama model to use."),
     output: Path = typer.Option(Path("vespera-output"), "--output", "-o", help="Output directory."),
     host: str = typer.Option(DEFAULT_OLLAMA_HOST, "--host", help="Ollama server URL."),
 ):
-    """Review a local dataroom and produce a due diligence report."""
+    """Analyse a local dataroom: findings, metrics, risks, score, thesis fit, valuation."""
     config = ReviewConfig(model=model, ollama_host=host, output_dir=output)
     provider = OllamaProvider(model=config.model, host=config.ollama_host)
 
@@ -110,12 +112,6 @@ def review(
         console.print("[yellow]No supported documents (.pdf, .docx, .txt, .md) found.[/yellow]")
         raise typer.Exit(code=1)
 
-    findings: list[Finding] = []
-    summaries: dict[str, DocumentSummary] = {}
-    reviewed: list[str] = []
-    empty: list[str] = []
-    processed = 0
-
     try:
         with Progress(
             TextColumn("[progress.description]{task.description}"),
@@ -124,49 +120,41 @@ def review(
             TimeElapsedColumn(),
             console=console,
         ) as progress:
-            task = progress.add_task("Analysing documents", total=len(paths))
-            for doc_path in paths:
-                relative_name = str(doc_path.relative_to(path))
-                progress.update(task, description=f"Analysing {relative_name}")
-                document = load_document(doc_path)
-                if document.is_empty:
-                    empty.append(relative_name)
-                else:
-                    doc_findings, summary = analyze_document(
-                        document, provider, config, relative_name
-                    )
-                    findings.extend(doc_findings)
-                    if summary is not None:
-                        summaries[relative_name] = summary
-                    reviewed.append(relative_name)
-                processed += 1
-                progress.advance(task)
-
-            # comparing documents needs deeper reasoning than clause extraction, so
-            # this single call runs with the model's thinking mode enabled
-            cross_task = progress.add_task("Cross-referencing documents (deep check)", total=1)
-            deep_provider = OllamaProvider(
-                model=config.model, host=config.ollama_host, think=True
+            task = progress.add_task("Analysing", total=None)
+            analysis = analyze_dataroom(
+                path,
+                thesis_path=thesis,
+                provider=provider,
+                config=config,
+                on_progress=lambda stage: progress.update(task, description=stage),
             )
-            findings.extend(cross_document_findings(summaries, deep_provider, config))
-            progress.advance(cross_task)
     except OllamaError as error:
         console.print(f"\n[red]Error:[/red] {error}")
         raise typer.Exit(code=1)
 
-    findings = aggregate_findings(findings)
-    report_path, findings_path = write_outputs(findings, reviewed, config.output_dir, empty)
+    report_path, findings_path, deal_path = write_outputs(analysis, config.output_dir)
 
-    console.print(f"Documents processed: {processed}\n")
-    console.print("[bold]Findings:[/bold]")
-    category_counts = Counter(f.category for f in findings)
+    console.print(f"Documents processed: {len(analysis.documents) + len(analysis.empty_documents)}\n")
+    console.print(
+        f"[bold]Deal readiness: {analysis.score.score}/100 — {analysis.score.label}[/bold]"
+    )
+    if analysis.valuation:
+        v = analysis.valuation
+        console.print(
+            f"Indicative range: {v.value_low_millions:.1f}–{v.value_high_millions:.1f}m "
+            f"{v.currency} (screening only)"
+        )
+    if analysis.thesis_fit:
+        console.print(f"Thesis fit: {analysis.thesis_fit.score}/100")
+    console.print("\n[bold]Findings:[/bold]")
+    category_counts = Counter(f.category for f in analysis.findings)
     if category_counts:
         for category, count in category_counts.most_common():
             console.print(f"- {category[0].upper() + category[1:]}: {count}")
     else:
         console.print("- No findings recorded")
     console.print(f"\nReport: [green]{report_path}[/green]")
-    console.print(f"Evidence: [green]{findings_path}[/green]")
+    console.print(f"Evidence: [green]{findings_path}[/green] · [green]{deal_path}[/green]")
     console.print("\n[dim]All document analysis was performed locally.[/dim]\n")
 
 

@@ -89,3 +89,135 @@ class DocumentSummary(BaseModel):
 
 class CrossDocumentFindings(BaseModel):
     findings: list[ExtractedFinding] = Field(default_factory=list)
+
+
+MetricName = Literal[
+    "revenue",
+    "arr",
+    "mrr",
+    "revenue growth",
+    "gross margin",
+    "operating profit/loss",
+    "ebitda",
+    "net revenue retention",
+    "cash balance",
+    "runway",
+    "customers",
+    "churn",
+]
+
+MetricUnit = Literal["GBP", "USD", "EUR", "percent", "count", "months", "other"]
+
+
+class ExtractedMetric(BaseModel):
+    """What the LLM returns for one financial metric; source is stamped by code."""
+
+    name: MetricName
+    value_text: str = Field(description="The value exactly as written in the document")
+    amount: float = Field(
+        description=(
+            "Numeric value: for currency metrics the amount in MILLIONS "
+            "(e.g. £54,500,000 -> 54.5); for percent the percentage number; "
+            "for counts/months the plain number"
+        )
+    )
+    unit: MetricUnit
+    period: str = Field(description="Period the value refers to, e.g. 'FY2025', or 'unknown'")
+    evidence: str = Field(description="Short verbatim excerpt containing the value")
+
+
+class ExtractedMetrics(BaseModel):
+    metrics: list[ExtractedMetric] = Field(
+        default_factory=list,
+        description="Financial metrics explicitly stated in the text. Empty if none.",
+    )
+
+
+class KeyMetric(BaseModel):
+    """A stamped, source-attributed metric."""
+
+    name: str
+    value_text: str
+    amount: float
+    unit: str
+    period: str
+    source_file: str
+    source_page: int | None
+    evidence: str
+
+
+class ReadinessScore(BaseModel):
+    score: int = Field(ge=0, le=100)
+    label: str
+    rationale: str
+
+
+class ScoreRationale(BaseModel):
+    rationale: str = Field(
+        description="One sentence weighing the favourable signals against the flagged risks"
+    )
+
+
+class ThesisPoint(BaseModel):
+    point: str
+    evidence: str = Field(description="Which document/metric supports this, briefly")
+
+
+class CriterionAssessment(BaseModel):
+    criterion: str = Field(description="The thesis criterion being assessed, briefly")
+    verdict: Literal["aligned", "conflict", "unknown"]
+    evidence: str = Field(
+        description="Which document or metric supports this verdict; 'none' for unknown"
+    )
+
+
+class ThesisAssessment(BaseModel):
+    """One assessment per thesis criterion — the list may not be empty."""
+
+    assessments: list[CriterionAssessment] = Field(min_length=1)
+
+
+class ThesisFit(BaseModel):
+    score: int = Field(ge=0, le=100, description="0 = clear mismatch, 100 = strong fit")
+    aligned: list[ThesisPoint] = Field(default_factory=list)
+    conflicts: list[ThesisPoint] = Field(default_factory=list)
+    unknowns: list[str] = Field(
+        default_factory=list,
+        description="Thesis criteria the dataroom gives no evidence for either way",
+    )
+
+
+class MultipleProposal(BaseModel):
+    """LLM proposes multiples and assumptions; the arithmetic happens in code."""
+
+    basis: Literal["revenue", "arr"]
+    multiple_low: float = Field(gt=0)
+    multiple_base: float = Field(gt=0)
+    multiple_high: float = Field(gt=0)
+    sector: str
+    assumptions: list[str] = Field(description="Every assumption behind the chosen multiples")
+    confidence: float = Field(ge=0.0, le=1.0)
+    caveats: list[str] = Field(default_factory=list)
+
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def _coerce_percentage(cls, value):
+        if isinstance(value, (int, float)) and 1.0 < value <= 100.0:
+            return value / 100.0
+        return value
+
+
+class ValuationResult(BaseModel):
+    basis_metric: str
+    basis_amount_millions: float
+    currency: str
+    multiple_low: float
+    multiple_base: float
+    multiple_high: float
+    value_low_millions: float
+    value_base_millions: float
+    value_high_millions: float
+    sector: str
+    assumptions: list[str]
+    confidence: float
+    caveats: list[str]

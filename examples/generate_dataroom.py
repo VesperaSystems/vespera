@@ -235,6 +235,58 @@ Eleanor Vance, Chair
 LINES_PER_PAGE = 46
 
 
+FINANCIALS = """NORTHGATE ROBOTICS LTD
+
+FINANCIAL SUMMARY — FY2025 (UNAUDITED MANAGEMENT ACCOUNTS)
+
+Prepared by the CFO office, 30 September 2025. All figures in GBP unless stated.
+
+1. REVENUE. Total revenue for FY2025 was £12.4 million, up 46% from £8.5 million in
+FY2024. Recurring software and support revenue (ARR basis) at year end was
+£9.6 million.
+
+2. GROSS MARGIN. Blended gross margin was 61%, reflecting the mix of hardware
+(41% margin) and software subscriptions (84% margin).
+
+3. OPERATING RESULT. Operating loss for FY2025 was £1.8 million, an improvement from
+a £3.1 million loss in FY2024.
+
+4. CASH. Cash at bank on 30 September 2025 was £4.2 million. At the current net burn
+rate of approximately £0.35 million per month, this supports roughly 12 months of
+runway before the planned Series B.
+
+5. CUSTOMERS. The company served 86 active customers at year end, up from 61.
+Net revenue retention for the software business was 117%.
+
+6. CONCENTRATION. The three largest customers together represented 34% of FY2025
+revenue.
+
+This summary is unaudited and prepared for internal planning and investor discussions.
+"""
+
+INVESTOR_UPDATE = """NORTHGATE ROBOTICS — INVESTOR UPDATE — OCTOBER 2025
+
+Dear investors,
+
+Momentum has continued through the autumn. A few highlights ahead of the Series B
+process:
+
+- Annual recurring revenue has now reached £11.2 million, and we expect to cross
+  £12 million ARR before the end of the calendar year.
+- We added nine new enterprise logos this quarter, taking us to 95 active customers.
+- The NG-7 motor controller line, powered by firmware from Rivera Embedded
+  Consulting, is now shipping in production volumes.
+- Gross margin continues to trend upward as software becomes a larger share of the
+  mix.
+
+We remain confident in the plan presented at the last board meeting and look forward
+to sharing the full Series B materials shortly.
+
+Eleanor Vance
+CEO, Northgate Robotics Ltd
+"""
+
+
 def write_pdf(name: str, text: str, title: str) -> None:
     doc = pymupdf.open()
     rect = pymupdf.paper_rect("a4")
@@ -274,6 +326,9 @@ def main() -> None:
     write_docx("05-board-minutes-2025-10-10.docx", BOARD_MINUTES)
     (OUT / "06-mutual-nda.txt").write_text(NDA_TXT, encoding="utf-8")
     print("wrote 06-mutual-nda.txt")
+    write_pdf("07-financial-summary-fy2025.pdf", FINANCIALS, "Financial Summary FY2025 — Northgate Robotics Ltd")
+    (OUT / "08-investor-update-oct-2025.txt").write_text(INVESTOR_UPDATE, encoding="utf-8")
+    print("wrote 08-investor-update-oct-2025.txt")
 
 
 if __name__ == "__main__":

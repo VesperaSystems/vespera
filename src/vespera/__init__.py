@@ -1,3 +1,3 @@
-"""Vespera: local-first AI due diligence."""
+"""Vespera: local-first AI deal analysis and due diligence."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
