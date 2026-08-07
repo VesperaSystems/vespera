@@ -1,6 +1,5 @@
 """Chunking and per-document / cross-document analysis."""
 
-import json
 import re
 from dataclasses import dataclass
 
@@ -40,6 +39,23 @@ def _is_noise(finding) -> bool:
     if finding.severity == "info":
         return True
     return bool(_POSITIVE_SIGNATURE_NOTE.search(f"{finding.title} {finding.summary}"))
+
+
+# cross-document "everything is fine" non-findings, same failure mode as above
+_NON_FINDING = re.compile(
+    r"\bno (documents? |other )?(is |are )?missing\b"
+    r"|\bnot missing\b"
+    r"|\bno (such )?(conflicts?|inconsistenc\w+|discrepanc\w+)\b"
+    r"|\b(is|are) consistent\b"
+    r"|\bno missing documents\b"
+    r"|\breferences? no documents?\b"
+    r"|\bno referenced documents?\b"
+    r"|\bdoes not reference\b"
+    r"|\bno references\b"
+    r"|\bnot a missing document\b"
+    r"|\bnot missing from the dataroom\b",
+    re.IGNORECASE,
+)
 
 
 def chunk_document(document: Document, chunk_chars: int, overlap_chars: int = 0) -> list[Chunk]:
@@ -111,6 +127,19 @@ def analyze_document(
     return findings, summary
 
 
+def _render_summary(name: str, summary: DocumentSummary) -> str:
+    """Compact rendering — small local models compare focused text far better than
+    verbose JSON dumps."""
+    lines = [f"### {name} ({summary.contract_type})"]
+    if summary.parties:
+        lines.append(f"Parties: {'; '.join(summary.parties)}")
+    if summary.referenced_documents:
+        lines.append(f"References these documents: {'; '.join(summary.referenced_documents)}")
+    for fact in summary.key_facts:
+        lines.append(f"- {fact}")
+    return "\n".join(lines)
+
+
 def cross_document_findings(
     summaries: dict[str, DocumentSummary],
     provider: LLMProvider,
@@ -120,26 +149,36 @@ def cross_document_findings(
     if len(summaries) < 2:
         return []
     file_list = "\n".join(f"- {name}" for name in summaries)
-    rendered = "\n".join(
-        f"### {name}\n{json.dumps(summary.model_dump(), indent=2)}"
-        for name, summary in summaries.items()
-    )
+    rendered = "\n\n".join(_render_summary(name, s) for name, s in summaries.items())
     prompt = prompts.CROSS_DOCUMENT_PROMPT.format(
         role=prompts.ANALYST_ROLE, file_list=file_list, summaries=rendered
     )
     result = provider.generate_structured(prompt, CrossDocumentFindings)
     allowed = {"missing documents explicitly referenced elsewhere", "inconsistencies between documents"}
-    return [
-        Finding(
-            category=extracted.category,
-            title=extracted.title,
-            summary=extracted.summary,
-            severity=extracted.severity,
-            source_file="(multiple documents)",
-            source_page=None,
-            evidence=extracted.evidence[: config.max_evidence_chars],
-            confidence=extracted.confidence,
+    findings = []
+    for extracted in result.findings:
+        if _NON_FINDING.search(f"{extracted.title} {extracted.summary}"):
+            continue
+        # this pass only asks for the two cross-document categories, but models often
+        # label a conflict by its subject matter (e.g. "IP ownership / assignment");
+        # re-categorize rather than silently dropping a genuine finding
+        category = extracted.category
+        if category not in allowed:
+            text = f"{extracted.title} {extracted.summary}".lower()
+            if "missing" in text or "not in the dataroom" in text:
+                category = "missing documents explicitly referenced elsewhere"
+            else:
+                category = "inconsistencies between documents"
+        findings.append(
+            Finding(
+                category=category,
+                title=extracted.title,
+                summary=extracted.summary,
+                severity=extracted.severity,
+                source_file="(multiple documents)",
+                source_page=None,
+                evidence=extracted.evidence[: config.max_evidence_chars],
+                confidence=extracted.confidence,
+            )
         )
-        for extracted in result.findings
-        if extracted.category in allowed
-    ]
+    return findings

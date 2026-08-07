@@ -1,7 +1,20 @@
 """Ollama-backed LLM provider using the local HTTP API."""
 
+import json
+from typing import Iterator
+
 import httpx
 from pydantic import BaseModel, ValidationError
+
+
+def model_matches(requested: str, available: list[str]) -> bool:
+    """True if the requested model name is in the available list.
+
+    Ollama lists untagged pulls as "name:latest", so "qwen3" matches "qwen3:latest".
+    """
+    if requested in available:
+        return True
+    return ":" not in requested and f"{requested}:latest" in available
 
 
 class OllamaError(RuntimeError):
@@ -9,9 +22,16 @@ class OllamaError(RuntimeError):
 
 
 class OllamaProvider:
-    def __init__(self, model: str, host: str = "http://localhost:11434", timeout: float = 300.0):
+    def __init__(
+        self,
+        model: str,
+        host: str = "http://localhost:11434",
+        timeout: float = 900.0,
+        think: bool = False,
+    ):
         self.model = model
         self.host = host.rstrip("/")
+        self.think = think
         self._client = httpx.Client(base_url=self.host, timeout=timeout)
 
     def generate_structured(self, prompt: str, schema: type[BaseModel]) -> BaseModel:
@@ -30,7 +50,7 @@ class OllamaProvider:
             "messages": [{"role": "user", "content": prompt}],
             "stream": False,
             "format": schema.model_json_schema(),
-            "think": False,
+            "think": self.think,
             "options": {"temperature": 0.1},
         }
         try:
@@ -57,3 +77,27 @@ class OllamaProvider:
         except httpx.HTTPError:
             return []
         return [item["name"] for item in response.json().get("models", [])]
+
+    def is_server_running(self) -> bool:
+        try:
+            self._client.get("/api/version").raise_for_status()
+            return True
+        except httpx.HTTPError:
+            return False
+
+    def has_model(self) -> bool:
+        return model_matches(self.model, self.list_local_models())
+
+    def pull_model(self) -> Iterator[dict]:
+        """Pull the model, yielding Ollama progress events ({status, total?, completed?})."""
+        with self._client.stream(
+            "POST", "/api/pull", json={"model": self.model}, timeout=None
+        ) as response:
+            response.raise_for_status()
+            for line in response.iter_lines():
+                if not line.strip():
+                    continue
+                event = json.loads(line)
+                if "error" in event:
+                    raise OllamaError(f"Could not download model '{self.model}': {event['error']}")
+                yield event

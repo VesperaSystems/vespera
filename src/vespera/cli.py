@@ -5,10 +5,18 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
-from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn, TimeElapsedColumn
+from rich.progress import (
+    BarColumn,
+    DownloadColumn,
+    Progress,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TransferSpeedColumn,
+)
 
 import vespera
-from vespera.config import DEFAULT_MODEL, DEFAULT_OLLAMA_HOST, ReviewConfig
+from vespera.config import DEFAULT_MODEL, DEFAULT_OLLAMA_HOST, RECOMMENDED_MODELS, ReviewConfig
 from vespera.documents.loader import discover_documents, load_document
 from vespera.llm.ollama import OllamaError, OllamaProvider
 from vespera.review.aggregator import aggregate_findings
@@ -18,6 +26,46 @@ from vespera.review.report import write_outputs
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 console = Console()
+
+OLLAMA_MISSING_HELP = """\
+[red]Ollama is not running.[/red]
+
+Vespera uses [bold]Ollama[/bold] to run the AI model locally, so your documents never
+leave this computer.
+
+- If Ollama is not installed yet: download it from [link]https://ollama.com/download[/link]
+  and open it once (macOS users can also run: brew install ollama).
+- If Ollama is installed: start the Ollama app, or run [bold]ollama serve[/bold] in
+  another terminal.
+
+Then re-run this command.\
+"""
+
+
+def _ensure_ready(provider: OllamaProvider) -> None:
+    """Check Ollama is up and the model is present; download the model if not."""
+    if not provider.is_server_running():
+        console.print(OLLAMA_MISSING_HELP)
+        raise typer.Exit(code=1)
+    if provider.has_model():
+        return
+    console.print(
+        f"Model [cyan]{provider.model}[/cyan] is not installed yet — "
+        "downloading it now (one-time step).\n"
+    )
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        DownloadColumn(),
+        TransferSpeedColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task(f"Downloading {provider.model}", total=None)
+        for event in provider.pull_model():
+            total, completed = event.get("total"), event.get("completed")
+            if total:
+                progress.update(task, total=total, completed=completed or 0)
+    console.print(f"Model [cyan]{provider.model}[/cyan] ready.\n")
 
 
 def _version_callback(value: bool):
@@ -47,6 +95,13 @@ def review(
     provider = OllamaProvider(model=config.model, host=config.ollama_host)
 
     console.print("\n[bold]Vespera[/bold]\n")
+
+    try:
+        _ensure_ready(provider)
+    except OllamaError as error:
+        console.print(f"[red]Error:[/red] {error}")
+        raise typer.Exit(code=1)
+
     console.print(f"Reviewing [cyan]{path}[/cyan]\n")
 
     paths = discover_documents(path)
@@ -87,8 +142,13 @@ def review(
                 processed += 1
                 progress.advance(task)
 
-            cross_task = progress.add_task("Cross-referencing documents", total=1)
-            findings.extend(cross_document_findings(summaries, provider, config))
+            # comparing documents needs deeper reasoning than clause extraction, so
+            # this single call runs with the model's thinking mode enabled
+            cross_task = progress.add_task("Cross-referencing documents (deep check)", total=1)
+            deep_provider = OllamaProvider(
+                model=config.model, host=config.ollama_host, think=True
+            )
+            findings.extend(cross_document_findings(summaries, deep_provider, config))
             progress.advance(cross_task)
     except OllamaError as error:
         console.print(f"\n[red]Error:[/red] {error}")
@@ -114,15 +174,26 @@ def review(
 def models(
     host: str = typer.Option(DEFAULT_OLLAMA_HOST, "--host", help="Ollama server URL."),
 ):
-    """Show the default model and locally installed Ollama models."""
-    console.print(f"Default model: [cyan]{DEFAULT_MODEL}[/cyan]")
+    """Show recommended and locally installed Ollama models."""
     provider = OllamaProvider(model=DEFAULT_MODEL, host=host)
     local = provider.list_local_models()
+    annotations = dict(RECOMMENDED_MODELS)
+
+    console.print("Recommended models (pick with --model):")
+    for name, annotation in RECOMMENDED_MODELS:
+        markers = f" [dim]({annotation})[/dim]"
+        if name == DEFAULT_MODEL:
+            markers += " [green](default)[/green]"
+        if local and name not in local:
+            markers += f" [yellow]not installed — run: ollama pull {name}[/yellow]"
+        console.print(f"- {name}{markers}")
+
     if local:
-        console.print("Locally installed Ollama models:")
-        for name in local:
-            marker = " [green](default)[/green]" if name == DEFAULT_MODEL else ""
-            console.print(f"- {name}{marker}")
+        others = [name for name in local if name not in annotations]
+        if others:
+            console.print("Other locally installed Ollama models:")
+            for name in others:
+                console.print(f"- {name}")
     else:
         console.print(
             f"[yellow]Could not list local models — is Ollama running at {host}?[/yellow]"

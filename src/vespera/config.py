@@ -4,7 +4,12 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-DEFAULT_MODEL = "qwen3:8b"
+# recommended models, fastest first; the default is the fastest
+RECOMMENDED_MODELS: list[tuple[str, str]] = [
+    ("qwen3:4b", "faster"),
+    ("qwen3:8b", "more thorough"),
+]
+DEFAULT_MODEL = RECOMMENDED_MODELS[0][0]
 DEFAULT_OLLAMA_HOST = os.environ.get("VESPERA_OLLAMA_HOST", "http://localhost:11434")
 
 

@@ -50,23 +50,23 @@ Every finding carries its category, severity, a short verbatim evidence excerpt,
 
 ## Quick start
 
-1. Install [Ollama](https://ollama.com) and pull a model:
+1. Install [Ollama](https://ollama.com/download) — the free app that runs AI models on your own computer — and open it once.
 
-   ```bash
-   ollama pull qwen3:8b
-   ```
-
-2. Install Vespera (Python 3.12+):
+2. Install Vespera (needs Python 3.12+):
 
    ```bash
    pip install vespera
    ```
 
-3. Review a dataroom:
+3. Point it at a folder of documents:
 
    ```bash
    vespera review ./dataroom
    ```
+
+That's it. On the first run Vespera automatically downloads its default local model (`qwen3:4b`, ~2.6 GB, one-time) and then starts the review. If anything is missing, Vespera tells you exactly what to do.
+
+Prefer a more thorough (slower) review? Use `--model qwen3:8b`. See what's available with `vespera models`.
 
 Try it on the included synthetic example:
 
@@ -80,7 +80,7 @@ vespera review ./examples/sample-dataroom
 
 ```bash
 vespera review PATH [--model qwen3:8b] [--output vespera-output] [--host http://localhost:11434]
-vespera models      # show default + locally installed Ollama models
+vespera models      # show recommended + locally installed Ollama models
 vespera --version
 ```
 

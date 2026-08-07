@@ -47,6 +47,9 @@ SUMMARY_PROMPT = """\
 
 Summarise the key facts of this document for cross-referencing against other documents
 in the same dataroom. Only state what the text supports; use "unknown" when unclear.
+Work through the ENTIRE document from start to finish — cover every numbered clause,
+section, or agenda item. In "key_facts", include every monetary amount or commitment,
+every claim about who owns an asset or intellectual property, and every key date.
 For "signed": true only if the text shows completed signatures (names/dates filled in).
 
 Document: {source_file}
@@ -72,6 +75,9 @@ report only two kinds of findings:
 
 Rules:
 - Only report what these summaries support. Empty list is a valid answer.
+- Report a finding ONLY when a document is actually missing or facts actually conflict.
+  Never return a finding saying documents are consistent or nothing is missing — return
+  an empty list instead.
 - "evidence" must name the documents involved and the conflicting or missing item.
 - Do not repeat single-document findings (signatures, clauses); those are handled elsewhere.
 

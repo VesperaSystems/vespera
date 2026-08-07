@@ -80,13 +80,13 @@ def test_cross_document_findings_filters_categories():
             evidence="Schedule B (Service Levels)",
             confidence=0.8,
         ),
-        ExtractedFinding(  # out-of-scope category must be dropped
-            category="governing law",
-            title="English law",
-            summary="n/a",
-            severity="info",
-            evidence="x",
-            confidence=0.5,
+        ExtractedFinding(  # mislabeled conflict must be re-categorized, not dropped
+            category="IP ownership / assignment",
+            title="Conflict on NG-7 firmware ownership",
+            summary="Contract and board minutes disagree on who owns the firmware IP.",
+            severity="high",
+            evidence="a.pdf vs b.pdf",
+            confidence=0.9,
         ),
     ]
     provider = FakeProvider(cross_findings=cross)
@@ -95,8 +95,27 @@ def test_cross_document_findings_filters_categories():
         "b.pdf": DocumentSummary(contract_type="NDA", signed=True),
     }
     result = cross_document_findings(summaries, provider, ReviewConfig())
-    assert len(result) == 1
-    assert result[0].source_file == "(multiple documents)"
+    assert len(result) == 2
+    assert all(f.source_file == "(multiple documents)" for f in result)
+    recategorized = next(f for f in result if f.title == "Conflict on NG-7 firmware ownership")
+    assert recategorized.category == "inconsistencies between documents"
+
+
+def test_cross_document_drops_non_findings():
+    non_finding = ExtractedFinding(
+        category="missing documents explicitly referenced elsewhere",
+        title="No missing documents",
+        summary="The MSA references no documents, so no documents are missing.",
+        severity="low",
+        evidence="referenced_documents: []",
+        confidence=0.9,
+    )
+    provider = FakeProvider(cross_findings=[non_finding])
+    summaries = {
+        "a.pdf": DocumentSummary(contract_type="MSA", signed=True),
+        "b.pdf": DocumentSummary(contract_type="NDA", signed=True),
+    }
+    assert cross_document_findings(summaries, provider, ReviewConfig()) == []
 
 
 def test_cross_document_skips_single_document():
