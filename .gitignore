@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+vespera-output/
+.DS_Store
+.pytest_cache/

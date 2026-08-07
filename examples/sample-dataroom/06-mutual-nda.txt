@@ -1,0 +1,22 @@
+MUTUAL NON-DISCLOSURE AGREEMENT
+
+Made on 5 February 2025 between Northgate Robotics Ltd of 14 Foundry Lane, Sheffield
+("Northgate") and Halcyon Data Services GmbH of Torstrasse 88, Berlin ("Halcyon").
+
+1. Each party may disclose Confidential Information to the other for the purpose of
+evaluating a potential data services partnership (the "Purpose").
+
+2. The receiving party shall use Confidential Information solely for the Purpose and
+shall protect it with at least the same care it applies to its own confidential
+information, and no less than reasonable care.
+
+3. The obligations in this Agreement last for five (5) years from the date of
+disclosure.
+
+4. Nothing in this Agreement obliges either party to enter into any further agreement.
+
+5. This Agreement is governed by the laws of England and Wales.
+
+Signed:
+Eleanor Vance, CEO, Northgate Robotics Ltd, 5 February 2025
+Jurgen Kessler, Geschaftsfuhrer, Halcyon Data Services GmbH, 5 February 2025
