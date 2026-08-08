@@ -137,4 +137,4 @@ The LLM is behind a tiny provider interface (`vespera/llm/base.py`), so tests in
 
 ## License
 
-[Apache-2.0](LICENSE)
+[Apache-2.0](LICENSE) — Copyright 2026 Daniel Molloy
