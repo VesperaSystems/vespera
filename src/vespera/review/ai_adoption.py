@@ -44,6 +44,8 @@ Rules:
   and the mechanism contradict each other.
 - If documents cover the area and show no AI at all, use "absent"; if the dataroom
   simply doesn't speak to it, use "unclear".
+- Keep "detail" and "evidence" to one or two short sentences each — state the
+  conclusion and the source, not your full reasoning.
 
 Example: a product sheet says "our AI-powered maintenance platform" but explains that
 alerts fire "when a reading exceeds the configured threshold" — that is a rule-based

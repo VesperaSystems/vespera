@@ -141,6 +141,12 @@ def _valuation_section(analysis: "DealAnalysis") -> list[str]:
     return parts
 
 
+def _cell(text: str, limit: int = 220) -> str:
+    """Make model text safe for a Markdown table cell."""
+    clean = " ".join(text.replace("|", "/").split()).lstrip(" .,;:")
+    return clean[: limit - 1] + "…" if len(clean) > limit else clean
+
+
 def _ai_section(analysis: "DealAnalysis") -> list[str]:
     profile = analysis.ai_profile
     if profile is None:
@@ -155,11 +161,12 @@ def _ai_section(analysis: "DealAnalysis") -> list[str]:
     ]
     for item in profile.aspects:
         parts.append(
-            f"| {_cap(item.aspect)} | {item.verdict} | {item.detail} | {item.evidence} |"
+            f"| {_cap(item.aspect)} | {item.verdict} "
+            f"| {_cell(item.detail)} | {_cell(item.evidence, 120)} |"
         )
     parts += [
         "",
-        f"Automation leverage: {profile.automation_leverage}",
+        f"Automation leverage: {_cell(profile.automation_leverage, 500)}",
         "",
         "AI-native, AI-augmented, and non-AI businesses carry different margin "
         "structures and headcount leverage; this profile is an input to the "
