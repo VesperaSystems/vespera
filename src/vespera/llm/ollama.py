@@ -51,7 +51,13 @@ class OllamaProvider:
             "stream": False,
             "format": schema.model_json_schema(),
             "think": self.think,
-            "options": {"temperature": 0.1},
+            "options": {
+                "temperature": 0.1,
+                # Ollama's default 4k context truncates larger prompts, which can send
+                # thinking models into runaway generation; num_predict caps that too
+                "num_ctx": 16384,
+                "num_predict": 8192,
+            },
         }
         try:
             response = self._client.post("/api/chat", json=payload)
@@ -60,6 +66,12 @@ class OllamaProvider:
             raise OllamaError(
                 f"Cannot reach Ollama at {self.host}. Is it running? "
                 "Install from https://ollama.com and run: ollama serve"
+            ) from error
+        except httpx.TimeoutException as error:
+            raise OllamaError(
+                f"The model took longer than {self._client.timeout.read:.0f}s to respond. "
+                "The machine may be under heavy load — close other applications and retry, "
+                "or use a smaller model (vespera models)."
             ) from error
         except httpx.HTTPStatusError as error:
             detail = error.response.text[:300]

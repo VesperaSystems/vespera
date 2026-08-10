@@ -18,6 +18,7 @@ Built for the first-pass review in M&A, VC, and PE deals:
 - **Due diligence findings** — change-of-control clauses, termination rights, exclusivity, IP ownership, material liabilities, missing signatures — each with severity, a verbatim evidence excerpt, and the source file and page
 - **Key metrics** — revenue, ARR, growth, margins, retention, runway, extracted only where explicitly stated, every value cited to its source
 - **Contradiction detection** — the same metric reported differently in two documents, conflicting claims across contracts and board minutes, referenced schedules that aren't in the dataroom
+- **AI adoption profile** — is AI evidenced in the product, operations, and engineering, or only claimed? "AI-powered" marketing with a rule-based mechanism underneath is flagged as a red flag, and the profile feeds the valuation: AI-native economics, AI-augmented operations, and AI-adoption headroom carry different margin structures and multiples
 - **Deal readiness score** — a reproducible severity-weighted score with a Strong / Balanced / Cautious reading
 - **Thesis fit** — write your investment thesis once in Markdown; every deal is scored against it, with aligned points, conflicts, and unknowns
 - **Indicative valuation** — a multiples-based screening range with every assumption listed (a range to interrogate, never an appraisal)
@@ -27,9 +28,10 @@ Vespera
 
 Reviewing ./dataroom
 
-Documents found: 8
+Documents found: 9
 
 Deal readiness: 44/100 — Balanced reading
+AI posture: AI claimed, not evidenced
 Indicative range: 38.4–76.8m GBP (screening only)
 Thesis fit: 55/100
 

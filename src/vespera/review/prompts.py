@@ -49,7 +49,9 @@ Summarise the key facts of this document for cross-referencing against other doc
 in the same dataroom. Only state what the text supports; use "unknown" when unclear.
 Work through the ENTIRE document from start to finish — cover every numbered clause,
 section, or agenda item. In "key_facts", include every monetary amount or commitment,
-every claim about who owns an asset or intellectual property, and every key date.
+every claim about who owns an asset or intellectual property, every key date, and any
+statement about AI, machine learning, or automation — whether a concrete technical
+description or just a marketing claim (quote it either way).
 For "signed": true only if the text shows completed signatures (names/dates filled in).
 
 Document: {source_file}

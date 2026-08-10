@@ -138,6 +138,8 @@ def review(
     console.print(
         f"[bold]Deal readiness: {analysis.score.score}/100 — {analysis.score.label}[/bold]"
     )
+    if analysis.ai_profile:
+        console.print(f"AI posture: {analysis.ai_profile.posture}")
     if analysis.valuation:
         v = analysis.valuation
         console.print(

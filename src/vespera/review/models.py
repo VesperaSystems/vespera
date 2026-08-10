@@ -187,6 +187,46 @@ class ThesisFit(BaseModel):
     )
 
 
+AIAspect = Literal["product", "operations", "engineering"]
+AIVerdict = Literal["evidenced", "claimed-only", "absent", "unclear"]
+
+
+class AIAspectAssessment(BaseModel):
+    aspect: AIAspect
+    verdict: AIVerdict = Field(
+        description=(
+            "'evidenced': documents show concrete AI/ML/LLM use (models, infrastructure, "
+            "agentic workflows, named AI systems doing real work). 'claimed-only': AI is "
+            "asserted in marketing or investor language but nothing technical supports it. "
+            "'absent': documents cover this area and show no AI use. 'unclear': the "
+            "documents don't cover this area."
+        )
+    )
+    detail: str = Field(description="What the AI use or claim actually is, briefly")
+    evidence: str = Field(description="Which document says so; 'none' for absent/unclear")
+
+
+class AIAssessment(BaseModel):
+    """One assessment per aspect (product, operations, engineering) — never empty."""
+
+    aspects: list[AIAspectAssessment] = Field(min_length=1)
+    automation_leverage: str = Field(
+        description=(
+            "One or two sentences: how much of this business's cost to serve looks "
+            "addressable by AI/automation, based only on the evidence"
+        )
+    )
+
+
+class AIProfile(BaseModel):
+    """Code-derived AI adoption profile; the posture label is deterministic."""
+
+    posture: str
+    product_ai: str
+    aspects: list[AIAspectAssessment]
+    automation_leverage: str
+
+
 class MultipleProposal(BaseModel):
     """LLM proposes multiples and assumptions; the arithmetic happens in code."""
 

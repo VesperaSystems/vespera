@@ -287,6 +287,34 @@ CEO, Northgate Robotics Ltd
 """
 
 
+PRODUCT_OVERVIEW = """NORTHGATE ROBOTICS — PRODUCT OVERVIEW
+
+NORTHGATE PULSE: AI-POWERED PREDICTIVE MAINTENANCE
+
+Prepared for the Series B process, October 2025.
+
+1. OVERVIEW. Northgate Pulse is our AI-powered predictive maintenance platform,
+bundled with every NG-7 motor controller. Pulse harnesses cutting-edge artificial
+intelligence to anticipate failures before they happen, delivering an intelligent,
+self-optimising maintenance experience for industrial customers.
+
+2. HOW IT WORKS. Pulse monitors vibration, temperature, and current draw on each
+connected actuator. When a reading exceeds the configured threshold for its device
+class, Pulse raises a maintenance ticket in the customer's CMMS via our REST API.
+Threshold values are set per device class at commissioning and can be adjusted by the
+customer's maintenance engineer from the Pulse dashboard.
+
+3. DEPLOYMENT. Pulse runs on our standard cloud stack (PostgreSQL, Redis, a Django
+application tier) and ships with connectors for SAP PM and Fiix.
+
+4. ROADMAP. We continue to invest in the intelligence layer of Pulse to extend our
+AI leadership in the predictive maintenance category.
+
+5. SUPPORT. Our support team handles all Pulse tickets by email and telephone with a
+target first response of four business hours.
+"""
+
+
 def write_pdf(name: str, text: str, title: str) -> None:
     doc = pymupdf.open()
     rect = pymupdf.paper_rect("a4")
@@ -329,6 +357,7 @@ def main() -> None:
     write_pdf("07-financial-summary-fy2025.pdf", FINANCIALS, "Financial Summary FY2025 — Northgate Robotics Ltd")
     (OUT / "08-investor-update-oct-2025.txt").write_text(INVESTOR_UPDATE, encoding="utf-8")
     print("wrote 08-investor-update-oct-2025.txt")
+    write_pdf("09-product-overview-pulse.pdf", PRODUCT_OVERVIEW, "Northgate Pulse — Product Overview")
 
 
 if __name__ == "__main__":

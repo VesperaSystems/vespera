@@ -17,6 +17,7 @@ from vespera.documents.loader import discover_documents, load_document
 from vespera.llm.base import LLMProvider
 from vespera.llm.ollama import OllamaProvider
 from vespera.review.aggregator import aggregate_findings
+from vespera.review.ai_adoption import ai_claim_findings, ai_excerpt, assess_ai_adoption
 from vespera.review.analyzer import analyze_document, cross_document_findings
 from vespera.review.metrics import (
     dedupe_metrics,
@@ -25,6 +26,7 @@ from vespera.review.metrics import (
     metric_conflicts,
 )
 from vespera.review.models import (
+    AIProfile,
     DocumentSummary,
     Finding,
     KeyMetric,
@@ -45,6 +47,7 @@ class DealAnalysis(BaseModel):
     findings: list[Finding]
     risk_matrix: dict[str, dict[str, int]]
     score: ReadinessScore
+    ai_profile: AIProfile | None
     thesis_fit: ThesisFit | None
     valuation: ValuationResult | None
 
@@ -71,6 +74,7 @@ def analyze_dataroom(
     findings: list[Finding] = []
     metrics: list[KeyMetric] = []
     summaries: dict[str, DocumentSummary] = {}
+    ai_excerpts: dict[str, str] = {}
     reviewed: list[str] = []
     empty: list[str] = []
 
@@ -88,6 +92,9 @@ def analyze_dataroom(
         if has_financial_content(document):
             notify(f"Extracting metrics from {relative_name}")
             metrics.extend(extract_metrics(document, provider, config, relative_name))
+        excerpt = ai_excerpt(document)
+        if excerpt is not None:
+            ai_excerpts[relative_name] = excerpt
         reviewed.append(relative_name)
 
     notify("Cross-referencing documents (deep check)")
@@ -96,6 +103,14 @@ def analyze_dataroom(
     metrics = dedupe_metrics(metrics)
     findings.extend(metric_conflicts(metrics))
     findings = aggregate_findings(findings)
+
+    ai_profile = None
+    if summaries:
+        notify("Assessing AI adoption")
+        ai_profile = assess_ai_adoption(summaries, findings, provider, excerpts=ai_excerpts)
+        claim_flags = ai_claim_findings(ai_profile)
+        if claim_flags:
+            findings = aggregate_findings(findings + claim_flags)
 
     notify("Scoring the deal")
     score = score_deal(findings, provider)
@@ -114,7 +129,9 @@ def analyze_dataroom(
         context_facts = [fact for s in summaries.values() for fact in s.key_facts[:2]]
         context = "; ".join(context_facts[:8]) or "unknown"
         top_flags = [f"{f.title} ({f.severity})" for f in findings[:6]]
-        valuation = indicative_valuation(metrics, context, top_flags, provider)
+        valuation = indicative_valuation(
+            metrics, context, top_flags, provider, ai_profile=ai_profile
+        )
 
     return DealAnalysis(
         documents=reviewed,
@@ -123,6 +140,7 @@ def analyze_dataroom(
         findings=findings,
         risk_matrix=matrix,
         score=score,
+        ai_profile=ai_profile,
         thesis_fit=thesis_fit,
         valuation=valuation,
     )

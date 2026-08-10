@@ -141,6 +141,35 @@ def _valuation_section(analysis: "DealAnalysis") -> list[str]:
     return parts
 
 
+def _ai_section(analysis: "DealAnalysis") -> list[str]:
+    profile = analysis.ai_profile
+    if profile is None:
+        return []
+    parts = [
+        "## AI Adoption",
+        "",
+        f"**Posture: {profile.posture}**",
+        "",
+        "| Aspect | Verdict | Detail | Evidence |",
+        "| --- | --- | --- | --- |",
+    ]
+    for item in profile.aspects:
+        parts.append(
+            f"| {_cap(item.aspect)} | {item.verdict} | {item.detail} | {item.evidence} |"
+        )
+    parts += [
+        "",
+        f"Automation leverage: {profile.automation_leverage}",
+        "",
+        "AI-native, AI-augmented, and non-AI businesses carry different margin "
+        "structures and headcount leverage; this profile is an input to the "
+        "indicative valuation. \"Evidenced\" requires technical or contractual "
+        "support — marketing language alone is reported as claimed-only.",
+        "",
+    ]
+    return parts
+
+
 def _risk_section(analysis: "DealAnalysis") -> list[str]:
     parts = [
         "## Risk Overview",
@@ -209,6 +238,7 @@ def render_markdown(analysis: "DealAnalysis") -> str:
         parts.append("")
 
     parts += _metrics_section(analysis)
+    parts += _ai_section(analysis)
     parts += _thesis_section(analysis)
     parts += _valuation_section(analysis)
     parts += _risk_section(analysis)

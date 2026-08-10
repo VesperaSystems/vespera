@@ -4,6 +4,8 @@ import pymupdf
 import pytest
 
 from vespera.review.models import (
+    AIAspectAssessment,
+    AIAssessment,
     ChunkFindings,
     CriterionAssessment,
     CrossDocumentFindings,
@@ -26,6 +28,7 @@ class FakeProvider:
         metrics=None,
         thesis_assessment=None,
         multiple_proposal=None,
+        ai_assessment=None,
     ):
         self.chunk_findings = chunk_findings or []
         self.summary = summary
@@ -33,6 +36,7 @@ class FakeProvider:
         self.metrics = metrics or []
         self.thesis_assessment = thesis_assessment
         self.multiple_proposal = multiple_proposal
+        self.ai_assessment = ai_assessment
         self.prompts: list[str] = []
 
     def generate_structured(self, prompt, schema):
@@ -56,6 +60,18 @@ class FakeProvider:
                         criterion="ARR scale", verdict="aligned", evidence="financials"
                     )
                 ]
+            )
+        if schema is AIAssessment:
+            return self.ai_assessment or AIAssessment(
+                aspects=[
+                    AIAspectAssessment(
+                        aspect="product",
+                        verdict="unclear",
+                        detail="no coverage",
+                        evidence="none",
+                    )
+                ],
+                automation_leverage="Not assessable from the evidence.",
             )
         if schema is MultipleProposal:
             if self.multiple_proposal is None:

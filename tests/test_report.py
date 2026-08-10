@@ -3,6 +3,8 @@ from pathlib import Path
 
 from vespera.deal import DealAnalysis
 from vespera.review.models import (
+    AIAspectAssessment,
+    AIProfile,
     Finding,
     KeyMetric,
     ReadinessScore,
@@ -72,6 +74,19 @@ def make_analysis(**overrides) -> DealAnalysis:
         findings=FINDINGS,
         risk_matrix=risk_matrix(FINDINGS),
         score=ReadinessScore(score=72, label="Strong reading", rationale="Mostly clean."),
+        ai_profile=AIProfile(
+            posture="AI claimed, not evidenced",
+            product_ai="claimed-only",
+            aspects=[
+                AIAspectAssessment(
+                    aspect="product",
+                    verdict="claimed-only",
+                    detail="'AI-powered' platform claim",
+                    evidence="product overview",
+                )
+            ],
+            automation_leverage="Support workflows look addressable.",
+        ),
         thesis_fit=ThesisFit(
             score=61,
             aligned=[ThesisPoint(point="ARR above £5m", evidence="financials.pdf")],
@@ -91,6 +106,8 @@ def test_report_contains_all_sections():
         "Deal readiness: 72/100 — Strong reading",
         "## Executive Summary",
         "## Key Metrics",
+        "## AI Adoption",
+        "Posture: AI claimed, not evidenced",
         "## Thesis Fit",
         "## Indicative Valuation",
         "## Risk Overview",
