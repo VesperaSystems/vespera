@@ -16,6 +16,8 @@ Vespera reads the documents in a local folder — contracts, board minutes, fina
 Built for the first-pass review in M&A, VC, and PE deals:
 
 - **Due diligence findings** — change-of-control clauses, termination rights, exclusivity, IP ownership, material liabilities, missing signatures — each with severity, a verbatim evidence excerpt, and the source file and page
+- **Mechanically verified citations** — the source file and page on every finding are stamped by code, not by the model, and every evidence quote is checked in code against the source document; a quote that cannot be matched verbatim is labelled as inference, so you never have to take a citation on trust
+- **Run record** — every report states the model, version, date, and verification counts behind it, and `deal.json` holds the full machine-readable analysis, so any figure can be explained months later
 - **Key metrics** — revenue, ARR, growth, margins, retention, runway, extracted only where explicitly stated, every value cited to its source
 - **Contradiction detection** — the same metric reported differently in two documents, conflicting claims across contracts and board minutes, referenced schedules that aren't in the dataroom
 - **AI adoption profile** — is AI evidenced in the product, operations, and engineering, or only claimed? "AI-powered" marketing with a rule-based mechanism underneath is flagged as a red flag, and the profile feeds the valuation: AI-native economics, AI-augmented operations, and AI-adoption headroom carry different margin structures and multiples

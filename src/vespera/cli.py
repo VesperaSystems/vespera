@@ -148,6 +148,11 @@ def review(
         )
     if analysis.thesis_fit:
         console.print(f"Thesis fit: {analysis.thesis_fit.score}/100")
+    if analysis.run and analysis.run.evidence_quotes_checked:
+        console.print(
+            f"Evidence quotes verified: {analysis.run.evidence_quotes_verified}"
+            f"/{analysis.run.evidence_quotes_checked}"
+        )
     console.print("\n[bold]Findings:[/bold]")
     category_counts = Counter(f.category for f in analysis.findings)
     if category_counts:

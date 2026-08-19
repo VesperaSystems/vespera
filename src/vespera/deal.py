@@ -7,10 +7,13 @@ Everything runs locally; `analysis` is a single pydantic object you can serializ
 render, or post-process.
 """
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
 from pydantic import BaseModel
+
+import vespera
 
 from vespera.config import ReviewConfig
 from vespera.documents.loader import discover_documents, load_document
@@ -38,6 +41,20 @@ from vespera.review.risks import risk_matrix
 from vespera.review.score import score_deal
 from vespera.review.thesis import assess_thesis_fit
 from vespera.review.valuation import indicative_valuation
+from vespera.review.verification import verify_findings, verify_metrics
+
+
+class RunRecord(BaseModel):
+    """How this analysis was produced, so any answer can be explained later."""
+
+    vespera_version: str
+    model: str
+    ollama_host: str
+    timestamp: str
+    chunk_chars: int
+    thesis_provided: bool
+    evidence_quotes_verified: int
+    evidence_quotes_checked: int
 
 
 class DealAnalysis(BaseModel):
@@ -50,6 +67,7 @@ class DealAnalysis(BaseModel):
     ai_profile: AIProfile | None
     thesis_fit: ThesisFit | None
     valuation: ValuationResult | None
+    run: RunRecord | None = None
 
 
 def analyze_dataroom(
@@ -75,6 +93,7 @@ def analyze_dataroom(
     metrics: list[KeyMetric] = []
     summaries: dict[str, DocumentSummary] = {}
     ai_excerpts: dict[str, str] = {}
+    texts: dict[str, str] = {}
     reviewed: list[str] = []
     empty: list[str] = []
 
@@ -95,6 +114,7 @@ def analyze_dataroom(
         excerpt = ai_excerpt(document)
         if excerpt is not None:
             ai_excerpts[relative_name] = excerpt
+        texts[relative_name] = document.text
         reviewed.append(relative_name)
 
     notify("Cross-referencing documents (deep check)")
@@ -111,6 +131,10 @@ def analyze_dataroom(
         claim_flags = ai_claim_findings(ai_profile)
         if claim_flags:
             findings = aggregate_findings(findings + claim_flags)
+
+    notify("Verifying evidence quotes")
+    quotes_verified, quotes_checked = verify_findings(findings, texts)
+    verify_metrics(metrics, texts)
 
     notify("Scoring the deal")
     score = score_deal(findings, provider)
@@ -133,6 +157,17 @@ def analyze_dataroom(
             metrics, context, top_flags, provider, ai_profile=ai_profile
         )
 
+    run = RunRecord(
+        vespera_version=vespera.__version__,
+        model=config.model,
+        ollama_host=config.ollama_host,
+        timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        chunk_chars=config.chunk_chars,
+        thesis_provided=thesis_path is not None,
+        evidence_quotes_verified=quotes_verified,
+        evidence_quotes_checked=quotes_checked,
+    )
+
     return DealAnalysis(
         documents=reviewed,
         empty_documents=empty,
@@ -143,4 +178,5 @@ def analyze_dataroom(
         ai_profile=ai_profile,
         thesis_fit=thesis_fit,
         valuation=valuation,
+        run=run,
     )

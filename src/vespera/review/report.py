@@ -45,7 +45,12 @@ def _finding_line(finding: Finding) -> str:
         f"  - Source: `{location}`",
     ]
     if finding.evidence.strip():
-        lines.append(f'  - Evidence: "{finding.evidence.strip()}"')
+        label = (
+            "Evidence (verified quote)"
+            if finding.evidence_verified
+            else "Evidence (unverified — treat as inference, check the source)"
+        )
+        lines.append(f'  - {label}: "{finding.evidence.strip()}"')
     return "\n".join(lines)
 
 
@@ -69,13 +74,14 @@ def _metrics_section(analysis: "DealAnalysis") -> list[str]:
     parts = [
         "## Key Metrics",
         "",
-        "| Metric | Value | Period | Source |",
-        "| --- | --- | --- | --- |",
+        "| Metric | Value | Period | Source | Quote |",
+        "| --- | --- | --- | --- | --- |",
     ]
     for m in analysis.metrics:
         source = m.source_file + (f", p. {m.source_page}" if m.source_page else "")
         value = m.value_text + (" (loss)" if m.amount < 0 else "")
-        parts.append(f"| {_cap(m.name)} | {value} | {m.period} | `{source}` |")
+        quote = "verified" if m.evidence_verified else "unverified"
+        parts.append(f"| {_cap(m.name)} | {value} | {m.period} | `{source}` | {quote} |")
     parts.append("")
     return parts
 
@@ -243,6 +249,14 @@ def render_markdown(analysis: "DealAnalysis") -> str:
             + "."
         )
         parts.append("")
+    if analysis.run and analysis.run.evidence_quotes_checked:
+        parts.append(
+            f"Evidence quotes mechanically verified against source documents: "
+            f"**{analysis.run.evidence_quotes_verified} of "
+            f"{analysis.run.evidence_quotes_checked}**. Quotes that could not be "
+            "matched verbatim are labelled as inference below."
+        )
+        parts.append("")
 
     parts += _metrics_section(analysis)
     parts += _ai_section(analysis)
@@ -273,6 +287,22 @@ def render_markdown(analysis: "DealAnalysis") -> str:
         parts += ["", "Documents with no extractable text (possibly scanned images):"]
         parts += [f"- `{name}`" for name in analysis.empty_documents]
     parts += ["", "## Limitations", "", LIMITATIONS, ""]
+    if analysis.run:
+        run = analysis.run
+        parts += [
+            "## Run Record",
+            "",
+            f"- Vespera version: {run.vespera_version}",
+            f"- Model: {run.model} (local, via Ollama at {run.ollama_host})",
+            f"- Generated: {run.timestamp}",
+            f"- Thesis provided: {'yes' if run.thesis_provided else 'no'}",
+            f"- Evidence quotes verified: {run.evidence_quotes_verified} of "
+            f"{run.evidence_quotes_checked}",
+            "",
+            "The full machine-readable analysis, including this record, is in "
+            "`deal.json` so any figure in this report can be traced later.",
+            "",
+        ]
     return "\n".join(parts)
 
 

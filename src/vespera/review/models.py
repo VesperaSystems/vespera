@@ -39,6 +39,10 @@ class Finding(BaseModel):
     source_page: int | None
     evidence: str
     confidence: float = Field(ge=0.0, le=1.0)
+    evidence_verified: bool = Field(
+        default=False,
+        description="True when code confirmed the evidence quote appears verbatim in the source",
+    )
 
 
 class ExtractedFinding(BaseModel):
@@ -144,6 +148,7 @@ class KeyMetric(BaseModel):
     source_file: str
     source_page: int | None
     evidence: str
+    evidence_verified: bool = False
 
 
 class ReadinessScore(BaseModel):
