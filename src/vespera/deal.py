@@ -144,7 +144,11 @@ def analyze_dataroom(
     if thesis_path is not None:
         notify("Assessing thesis fit")
         thesis_fit = assess_thesis_fit(
-            thesis_path.read_text(encoding="utf-8"), metrics, findings, provider
+            thesis_path.read_text(encoding="utf-8"),
+            metrics,
+            findings,
+            provider,
+            summaries=summaries,
         )
 
     valuation = None

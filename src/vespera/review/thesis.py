@@ -2,6 +2,7 @@
 
 from vespera.llm.base import LLMProvider
 from vespera.review.models import (
+    DocumentSummary,
     Finding,
     KeyMetric,
     ThesisAssessment,
@@ -31,10 +32,14 @@ Rules:
 --- END THESIS ---
 
 --- DEAL EVIDENCE ---
+What each document says (summaries):
+{summaries}
+
 Key metrics:
 {metrics}
 
-Key findings from the document review:
+Key findings from the document review (these are mostly risks by design; weigh them
+against the summaries above, which carry the positive and neutral facts):
 {findings}
 --- END DEAL EVIDENCE ---
 """
@@ -59,7 +64,12 @@ def assess_thesis_fit(
     metrics: list[KeyMetric],
     findings: list[Finding],
     provider: LLMProvider,
+    summaries: dict[str, DocumentSummary] | None = None,
 ) -> ThesisFit:
+    summary_lines = []
+    for name, summary in (summaries or {}).items():
+        facts = "; ".join(summary.key_facts[:8]) or summary.contract_type
+        summary_lines.append(f"- {name}: {facts}")
     metrics_lines = "\n".join(
         f"- {m.name}: {m.value_text} ({m.period}) [source: {m.source_file}]"
         + (" [NEGATIVE — this is a loss]" if m.amount < 0 else "")
@@ -72,6 +82,7 @@ def assess_thesis_fit(
     prompt = THESIS_PROMPT.format(
         role=ANALYST_ROLE,
         thesis=thesis_text.strip()[:6000],
+        summaries="\n".join(summary_lines) or "- none available",
         metrics=metrics_lines,
         findings=findings_lines,
     )
