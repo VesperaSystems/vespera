@@ -22,6 +22,8 @@ Extract the financial metrics that are EXPLICITLY stated in this document excerp
 
 Rules:
 - Only extract values written in the text. Never estimate, derive, or fill gaps.
+- Only ACTUAL, historical values. Never extract targets, forecasts, projections,
+  goals, or plans — "ARR target $500k" and "projected revenue" are not metrics.
 - Empty list is a valid answer if no metrics are stated.
 - "amount": for currency metrics give the amount in MILLIONS (£54,500,000 -> 54.5);
   for percentages give the percent number (57% -> 57); for counts give the number.
@@ -42,6 +44,39 @@ _AMOUNT_BOUNDS = {"percent": (0, 500), "count": (0, 10_000_000), "months": (0, 2
 _CURRENCY_BOUNDS = (0.001, 100_000)  # millions
 
 _CURRENCY_SIGNS = {"£": "GBP", "$": "USD", "€": "EUR"}
+
+# aspirational numbers are not metrics; the prompt forbids them, this enforces it
+_TARGET_HINT = re.compile(
+    r"\btargets?\b|\bforecasts?\b|\bproject(ed|ion|ions)\b|\bgoals?\b"
+    r"|\bexpected\b|\bplann?(ed|s)?\b|\baim(s|ed|ing)?\b|\bambition\b",
+    re.IGNORECASE,
+)
+
+_VALUE_PATTERN = re.compile(
+    r"([£$€])\s*([\d][\d,]*\.?\d*)\s*(k|thousand|m|mm|mn|million|bn|b|billion)?\b",
+    re.IGNORECASE,
+)
+
+_SUFFIX_TO_MILLIONS = {
+    "k": 0.001, "thousand": 0.001,
+    "m": 1.0, "mm": 1.0, "mn": 1.0, "million": 1.0,
+    "bn": 1000.0, "b": 1000.0, "billion": 1000.0,
+}
+
+
+def amount_from_text(value_text: str) -> float | None:
+    """Best-effort re-derivation of a currency amount in millions from the verbatim
+    value, used to catch thousand-fold unit slips like "$500k" recorded as 500."""
+    match = _VALUE_PATTERN.search(value_text.replace(",", ""))
+    if match is None:
+        return None
+    number = float(match.group(2))
+    suffix = (match.group(3) or "").lower()
+    if suffix:
+        return number * _SUFFIX_TO_MILLIONS[suffix]
+    if number >= 100_000:  # written out in full, e.g. £54,500,000
+        return number / 1_000_000
+    return None  # a bare small number gives no confident scale
 
 
 def infer_unit(value_text: str, fallback: str) -> str:
@@ -73,7 +108,15 @@ def extract_metrics(
     first_page = document.pages[0].number if document.pages else None
     metrics = []
     for extracted in result.metrics:
+        if _TARGET_HINT.search(f"{extracted.value_text} {extracted.period} {extracted.evidence}"):
+            continue
         unit = infer_unit(extracted.value_text, extracted.unit)
+        if unit in _CURRENCY_SIGNS.values():
+            derived = amount_from_text(extracted.value_text)
+            if derived is not None and extracted.amount > 0:
+                ratio = extracted.amount / derived
+                if ratio > 3 or ratio < 1 / 3:
+                    extracted.amount = derived  # trust the written value over the model
         low, high = _AMOUNT_BOUNDS.get(unit, _CURRENCY_BOUNDS)
         if not (low <= abs(extracted.amount) <= high):
             continue

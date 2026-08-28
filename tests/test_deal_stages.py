@@ -110,6 +110,75 @@ class TestUnitInference:
         assert infer_unit("86", "count") == "count"
 
 
+class TestAmountFromText:
+    def test_k_suffix(self):
+        from vespera.review.metrics import amount_from_text
+
+        assert amount_from_text("$500k") == 0.5
+        assert amount_from_text("$300K") == 0.3
+
+    def test_million_suffixes(self):
+        from vespera.review.metrics import amount_from_text
+
+        assert amount_from_text("£12.4 million") == 12.4
+        assert amount_from_text("$1M") == 1.0
+        assert amount_from_text("€2bn") == 2000.0
+
+    def test_written_in_full(self):
+        from vespera.review.metrics import amount_from_text
+
+        assert amount_from_text("£54,500,000") == 54.5
+
+    def test_bare_small_number_gives_no_scale(self):
+        from vespera.review.metrics import amount_from_text
+
+        assert amount_from_text("£850 per day") is None
+        assert amount_from_text("86 customers") is None
+
+
+class TestMetricGuards:
+    def run_extraction(self, tmp_path, extracted):
+        from conftest import FakeProvider
+
+        from vespera.config import ReviewConfig
+        from vespera.documents.loader import load_document
+        from vespera.review.metrics import extract_metrics
+
+        doc_path = tmp_path / "doc.txt"
+        doc_path.write_text("Revenue and ARR figures are discussed in this document.")
+        provider = FakeProvider(metrics=extracted)
+        return extract_metrics(load_document(doc_path), provider, ReviewConfig(), "doc.txt")
+
+    def test_targets_are_dropped(self, tmp_path):
+        from vespera.review.models import ExtractedMetric
+
+        target = ExtractedMetric(
+            name="arr", value_text="$500k", amount=0.5, unit="USD",
+            period="target Q4", evidence="ARR target $500k by year end",
+        )
+        assert self.run_extraction(tmp_path, [target]) == []
+
+    def test_thousandfold_slip_corrected(self, tmp_path):
+        from vespera.review.models import ExtractedMetric
+
+        slipped = ExtractedMetric(
+            name="arr", value_text="$500k", amount=500.0, unit="USD",
+            period="FY2025", evidence="ARR reached $500k in FY2025",
+        )
+        metrics = self.run_extraction(tmp_path, [slipped])
+        assert metrics[0].amount == 0.5
+
+    def test_correct_amount_untouched(self, tmp_path):
+        from vespera.review.models import ExtractedMetric
+
+        good = ExtractedMetric(
+            name="revenue", value_text="£12.4 million", amount=12.4, unit="GBP",
+            period="FY2025", evidence="Total revenue for FY2025 was £12.4 million",
+        )
+        metrics = self.run_extraction(tmp_path, [good])
+        assert metrics[0].amount == 12.4
+
+
 class TestLossSign:
     def test_loss_in_evidence_flips_sign(self, tmp_path):
         from conftest import FakeProvider
