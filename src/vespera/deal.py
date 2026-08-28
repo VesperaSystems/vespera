@@ -128,7 +128,10 @@ def analyze_dataroom(
         reviewed.append(relative_name)
 
     notify("Cross-referencing documents (deep check)")
-    findings.extend(cross_document_findings(summaries, deep_provider, config))
+    try:
+        findings.extend(cross_document_findings(summaries, deep_provider, config))
+    except Exception as error:
+        degraded.append(f"(cross-document check failed: {error})")
 
     metrics = dedupe_metrics(metrics)
     findings.extend(metric_conflicts(metrics))
@@ -137,10 +140,13 @@ def analyze_dataroom(
     ai_profile = None
     if summaries:
         notify("Assessing AI adoption")
-        ai_profile = assess_ai_adoption(summaries, findings, provider, excerpts=ai_excerpts)
-        claim_flags = ai_claim_findings(ai_profile)
-        if claim_flags:
-            findings = aggregate_findings(findings + claim_flags)
+        try:
+            ai_profile = assess_ai_adoption(summaries, findings, provider, excerpts=ai_excerpts)
+            claim_flags = ai_claim_findings(ai_profile)
+            if claim_flags:
+                findings = aggregate_findings(findings + claim_flags)
+        except Exception as error:
+            degraded.append(f"(AI adoption assessment failed: {error})")
 
     notify("Verifying evidence quotes")
     quotes_verified, quotes_checked = verify_findings(findings, texts)
@@ -153,23 +159,29 @@ def analyze_dataroom(
     thesis_fit = None
     if thesis_path is not None:
         notify("Assessing thesis fit")
-        thesis_fit = assess_thesis_fit(
-            thesis_path.read_text(encoding="utf-8"),
-            metrics,
-            findings,
-            provider,
-            summaries=summaries,
-        )
+        try:
+            thesis_fit = assess_thesis_fit(
+                thesis_path.read_text(encoding="utf-8"),
+                metrics,
+                findings,
+                provider,
+                summaries=summaries,
+            )
+        except Exception as error:
+            degraded.append(f"(thesis fit assessment failed: {error})")
 
     valuation = None
     if metrics:
         notify("Building indicative valuation")
-        context_facts = [fact for s in summaries.values() for fact in s.key_facts[:2]]
-        context = "; ".join(context_facts[:8]) or "unknown"
-        top_flags = [f"{f.title} ({f.severity})" for f in findings[:6]]
-        valuation = indicative_valuation(
-            metrics, context, top_flags, provider, ai_profile=ai_profile
-        )
+        try:
+            context_facts = [fact for s in summaries.values() for fact in s.key_facts[:2]]
+            context = "; ".join(context_facts[:8]) or "unknown"
+            top_flags = [f"{f.title} ({f.severity})" for f in findings[:6]]
+            valuation = indicative_valuation(
+                metrics, context, top_flags, provider, ai_profile=ai_profile
+            )
+        except Exception as error:
+            degraded.append(f"(indicative valuation failed: {error})")
 
     run = RunRecord(
         vespera_version=vespera.__version__,

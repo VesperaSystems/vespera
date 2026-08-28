@@ -132,6 +132,33 @@ def test_degraded_document_does_not_abort_run(tmp_path):
     assert analysis.degraded_documents == ["bad-metrics.txt (metrics extraction failed)"]
 
 
+def test_failed_deal_stage_does_not_abort_run(tmp_path):
+    from conftest import FakeProvider
+
+    from vespera.deal import analyze_dataroom
+    from vespera.llm.ollama import OllamaError
+    from vespera.review.models import AIAssessment, CrossDocumentFindings
+
+    room = tmp_path / "room"
+    room.mkdir()
+    (room / "a.txt").write_text("A plain note.")
+    (room / "b.txt").write_text("Another plain note.")
+
+    class FailingStagesProvider(FakeProvider):
+        def generate_structured(self, prompt, schema):
+            if schema in (CrossDocumentFindings, AIAssessment):
+                raise OllamaError("stage blew up")
+            return super().generate_structured(prompt, schema)
+
+    provider = FailingStagesProvider()
+    analysis = analyze_dataroom(room, provider=provider, deep_provider=provider)
+    assert len(analysis.documents) == 2
+    assert analysis.ai_profile is None
+    joined = " ".join(analysis.degraded_documents)
+    assert "cross-document check failed" in joined
+    assert "AI adoption assessment failed" in joined
+
+
 def test_verify_metrics():
     good = KeyMetric(
         name="revenue", value_text="£1m", amount=1.0, unit="GBP", period="FY25",
