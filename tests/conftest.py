@@ -14,6 +14,8 @@ from vespera.review.models import (
     MultipleProposal,
     ScoreRationale,
     ThesisAssessment,
+    TriageItem,
+    TriageResult,
 )
 
 
@@ -72,6 +74,17 @@ class FakeProvider:
                     )
                 ],
                 automation_leverage="Not assessable from the evidence.",
+            )
+        if schema is TriageResult:
+            return TriageResult(
+                items=[
+                    TriageItem(title="IP conflict", direction="deal-breaker", why="x", source="03"),
+                    TriageItem(title="No financials", direction="concern", why="x", source="room"),
+                    TriageItem(title="Strong retention", direction="strength", why="x", source="07"),
+                ],
+                missing_essentials=["historical financials"],
+                verdict="resolve the flagged items before a full review",
+                rationale="One unresolved deal-breaker and missing financials.",
             )
         if schema is MultipleProposal:
             if self.multiple_proposal is None:

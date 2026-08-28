@@ -170,6 +170,105 @@ def review(
     console.print("\n[dim]All document analysis was performed locally.[/dim]\n")
 
 
+_TRIAGE_MARKER = {"deal-breaker": "[red]✗[/red]", "concern": "[yellow]![/yellow]", "strength": "[green]✓[/green]"}
+
+
+@app.command()
+def triage(
+    path: Path = typer.Argument(..., exists=True, file_okay=False, help="Dataroom directory."),
+    thesis: Path = typer.Option(
+        None, "--thesis", "-t", exists=True, dir_okay=False,
+        help="Investment criteria (.md/.txt) to judge decisiveness against.",
+    ),
+    model: str = typer.Option(DEFAULT_MODEL, "--model", "-m", help="Ollama model to use."),
+    output: Path = typer.Option(Path("vespera-output"), "--output", "-o", help="Output directory."),
+    host: str = typer.Option(DEFAULT_OLLAMA_HOST, "--host", help="Ollama server URL."),
+):
+    """Fast screen before a full review: the three most decisive items in the dataroom."""
+    from vespera.review.triage import triage_dataroom
+
+    config = ReviewConfig(model=model, ollama_host=host, output_dir=output)
+    provider = OllamaProvider(model=config.model, host=config.ollama_host)
+
+    console.print("\n[bold]Vespera[/bold] — triage (fast screen, not a full review)\n")
+    try:
+        _ensure_ready(provider)
+    except OllamaError as error:
+        console.print(f"[red]Error:[/red] {error}")
+        raise typer.Exit(code=1)
+
+    console.print(f"Screening [cyan]{path}[/cyan]\n")
+    try:
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TimeElapsedColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Screening", total=None)
+            outcome = triage_dataroom(
+                path,
+                thesis_path=thesis,
+                provider=provider,
+                config=config,
+                on_progress=lambda stage: progress.update(task, description=stage),
+            )
+    except OllamaError as error:
+        console.print(f"\n[red]Error:[/red] {error}")
+        raise typer.Exit(code=1)
+
+    result = outcome.result
+    console.print(f"Documents screened: {len(outcome.documents)}\n")
+    console.print("[bold]The three most decisive items:[/bold]")
+    for item in result.items:
+        marker = _TRIAGE_MARKER.get(item.direction, "-")
+        console.print(f"{marker} [bold]{item.title}[/bold] ({item.direction})")
+        console.print(f"   {item.why}")
+        console.print(f"   Source: {item.source}")
+    if result.missing_essentials:
+        console.print("\n[bold]Missing from the dataroom:[/bold]")
+        for missing in result.missing_essentials:
+            console.print(f"- {missing}")
+    console.print(f"\n[bold]Screen verdict: {result.verdict}[/bold]")
+    console.print(f"{result.rationale}")
+    if outcome.degraded_documents:
+        console.print(
+            f"\n[yellow]{len(outcome.degraded_documents)} document(s) could not be "
+            "summarised and were not screened.[/yellow]"
+        )
+    console.print(
+        "\n[dim]This is a fast screen of document summaries to decide whether a full "
+        "review is worthwhile. It is not a review and not investment advice. "
+        "Run 'vespera review' for the full evidence-verified analysis.[/dim]\n"
+    )
+
+    output.mkdir(parents=True, exist_ok=True)
+    triage_path = output / "triage.md"
+    lines = [
+        "# Vespera Triage — fast screen",
+        "",
+        "> A fast screen of document summaries to decide whether a full review is "
+        "worthwhile. Not a review; not investment advice.",
+        "",
+        "## The three most decisive items",
+        "",
+    ]
+    for item in result.items:
+        lines += [
+            f"- **{item.title}** ({item.direction})",
+            f"  - {item.why}",
+            f"  - Source: {item.source}",
+        ]
+    if result.missing_essentials:
+        lines += ["", "## Missing from the dataroom", ""]
+        lines += [f"- {m}" for m in result.missing_essentials]
+    lines += ["", f"## Screen verdict: {result.verdict}", "", result.rationale, ""]
+    lines += ["## Documents screened", ""]
+    lines += [f"- `{name}`" for name in outcome.documents]
+    triage_path.write_text("\n".join(lines), encoding="utf-8")
+    console.print(f"Written: [green]{triage_path}[/green]\n")
+
+
 @app.command()
 def models(
     host: str = typer.Option(DEFAULT_OLLAMA_HOST, "--host", help="Ollama server URL."),

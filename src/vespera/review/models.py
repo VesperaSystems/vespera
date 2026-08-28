@@ -233,6 +233,33 @@ class AIProfile(BaseModel):
     automation_leverage: str
 
 
+class TriageItem(BaseModel):
+    title: str
+    direction: Literal["deal-breaker", "concern", "strength"]
+    why: str = Field(description="One or two sentences: why this is decisive for the deal")
+    source: str = Field(description="Which document(s) this comes from")
+
+
+class TriageResult(BaseModel):
+    """Fast screen: the three most decisive items, before any full review."""
+
+    items: list[TriageItem] = Field(
+        min_length=3,
+        max_length=3,
+        description="Exactly the three most decisive items in the dataroom",
+    )
+    missing_essentials: list[str] = Field(
+        default_factory=list,
+        description="Essential documents or facts absent from the dataroom",
+    )
+    verdict: Literal[
+        "full review looks worthwhile",
+        "resolve the flagged items before a full review",
+        "significant deal-breakers evident",
+    ]
+    rationale: str = Field(description="One sentence behind the verdict")
+
+
 class MultipleProposal(BaseModel):
     """LLM proposes multiples and assumptions; the arithmetic happens in code."""
 
