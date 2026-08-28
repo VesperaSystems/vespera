@@ -60,6 +60,7 @@ class RunRecord(BaseModel):
 class DealAnalysis(BaseModel):
     documents: list[str]
     empty_documents: list[str]
+    degraded_documents: list[str] = []
     metrics: list[KeyMetric]
     findings: list[Finding]
     risk_matrix: dict[str, dict[str, int]]
@@ -96,6 +97,7 @@ def analyze_dataroom(
     texts: dict[str, str] = {}
     reviewed: list[str] = []
     empty: list[str] = []
+    degraded: list[str] = []
 
     for doc_path in paths:
         relative_name = str(doc_path.relative_to(path))
@@ -104,13 +106,21 @@ def analyze_dataroom(
         if document.is_empty:
             empty.append(relative_name)
             continue
-        doc_findings, summary = analyze_document(document, provider, config, relative_name)
-        findings.extend(doc_findings)
-        if summary is not None:
-            summaries[relative_name] = summary
+        # one stubborn document must never abort the whole review; failed stages
+        # are recorded and surfaced in the report instead
+        try:
+            doc_findings, summary = analyze_document(document, provider, config, relative_name)
+            findings.extend(doc_findings)
+            if summary is not None:
+                summaries[relative_name] = summary
+        except Exception:
+            degraded.append(f"{relative_name} (findings extraction failed)")
         if has_financial_content(document):
             notify(f"Extracting metrics from {relative_name}")
-            metrics.extend(extract_metrics(document, provider, config, relative_name))
+            try:
+                metrics.extend(extract_metrics(document, provider, config, relative_name))
+            except Exception:
+                degraded.append(f"{relative_name} (metrics extraction failed)")
         excerpt = ai_excerpt(document)
         if excerpt is not None:
             ai_excerpts[relative_name] = excerpt
@@ -175,6 +185,7 @@ def analyze_dataroom(
     return DealAnalysis(
         documents=reviewed,
         empty_documents=empty,
+        degraded_documents=degraded,
         metrics=metrics,
         findings=findings,
         risk_matrix=matrix,

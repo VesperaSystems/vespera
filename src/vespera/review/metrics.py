@@ -24,6 +24,8 @@ Rules:
 - Only extract values written in the text. Never estimate, derive, or fill gaps.
 - Only ACTUAL, historical values. Never extract targets, forecasts, projections,
   goals, or plans — "ARR target $500k" and "projected revenue" are not metrics.
+- At most ONE value per metric: the most recent stated. Skip monthly or quarterly
+  breakdowns and tables of period-by-period values. Twenty metrics maximum.
 - Empty list is a valid answer if no metrics are stated.
 - "amount": for currency metrics give the amount in MILLIONS (£54,500,000 -> 54.5);
   for percentages give the percent number (57% -> 57); for counts give the number.

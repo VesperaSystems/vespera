@@ -135,6 +135,11 @@ def review(
     report_path, findings_path, deal_path = write_outputs(analysis, config.output_dir)
 
     console.print(f"Documents processed: {len(analysis.documents) + len(analysis.empty_documents)}\n")
+    if analysis.degraded_documents:
+        console.print(
+            f"[yellow]Warning: {len(analysis.degraded_documents)} document stage(s) "
+            "failed and were skipped — see the report's Documents Reviewed section.[/yellow]"
+        )
     console.print(
         f"[bold]Deal readiness: {analysis.score.score}/100 — {analysis.score.label}[/bold]"
     )

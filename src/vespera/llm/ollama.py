@@ -21,6 +21,25 @@ class OllamaError(RuntimeError):
     pass
 
 
+def _repair_truncated_json(content: str) -> list[str]:
+    """Candidate completions for JSON cut off mid-generation.
+
+    Walks back to the last few complete '}' and tries plausible closers, so a list
+    of 100 objects truncated inside object 101 still yields the first 100.
+    """
+    candidates = []
+    idx = len(content)
+    for _ in range(4):
+        idx = content.rfind("}", 0, idx)
+        if idx <= 0:
+            break
+        base = content[: idx + 1]
+        for closer in ("", "]", "}", "]}", "}]", "]}}"):
+            candidates.append(base + closer)
+        idx -= 1
+    return candidates
+
+
 class OllamaProvider:
     def __init__(
         self,
@@ -42,6 +61,13 @@ class OllamaProvider:
                 return schema.model_validate_json(content)
             except ValidationError as error:
                 last_error = error
+            # output truncated at the generation cap is the common failure; try to
+            # salvage the complete objects before paying for another model call
+            for candidate in _repair_truncated_json(content):
+                try:
+                    return schema.model_validate_json(candidate)
+                except ValidationError:
+                    continue
         raise OllamaError(f"Model returned output that failed validation twice: {last_error}")
 
     def _chat(self, prompt: str, schema: type[BaseModel]) -> str:

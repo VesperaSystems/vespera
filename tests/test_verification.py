@@ -85,6 +85,53 @@ class TestVerifyFindings:
         assert not finding.evidence_verified
 
 
+def test_repair_truncated_json():
+    from pydantic import BaseModel
+
+    from vespera.llm.ollama import _repair_truncated_json
+
+    class Item(BaseModel):
+        name: str
+
+    class Items(BaseModel):
+        metrics: list[Item]
+
+    truncated = '{\n  "metrics": [\n    {"name": "revenue"},\n    {"name": "gross margi'
+    repaired = None
+    for candidate in _repair_truncated_json(truncated):
+        try:
+            repaired = Items.model_validate_json(candidate)
+            break
+        except Exception:
+            continue
+    assert repaired is not None
+    assert [i.name for i in repaired.metrics] == ["revenue"]
+
+
+def test_degraded_document_does_not_abort_run(tmp_path):
+    from conftest import FakeProvider
+
+    from vespera.deal import analyze_dataroom
+    from vespera.llm.ollama import OllamaError
+    from vespera.review.models import ExtractedMetrics
+
+    room = tmp_path / "room"
+    room.mkdir()
+    (room / "good.txt").write_text("A plain note with no numbers.")
+    (room / "bad-metrics.txt").write_text("Revenue was £5 million this year.")
+
+    class FailingMetricsProvider(FakeProvider):
+        def generate_structured(self, prompt, schema):
+            if schema is ExtractedMetrics:
+                raise OllamaError("model returned output that failed validation twice")
+            return super().generate_structured(prompt, schema)
+
+    provider = FailingMetricsProvider()
+    analysis = analyze_dataroom(room, provider=provider, deep_provider=provider)
+    assert len(analysis.documents) == 2  # the run completed
+    assert analysis.degraded_documents == ["bad-metrics.txt (metrics extraction failed)"]
+
+
 def test_verify_metrics():
     good = KeyMetric(
         name="revenue", value_text="£1m", amount=1.0, unit="GBP", period="FY25",

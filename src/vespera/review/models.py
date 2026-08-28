@@ -133,6 +133,7 @@ class ExtractedMetric(BaseModel):
 class ExtractedMetrics(BaseModel):
     metrics: list[ExtractedMetric] = Field(
         default_factory=list,
+        max_length=20,
         description="Financial metrics explicitly stated in the text. Empty if none.",
     )
 

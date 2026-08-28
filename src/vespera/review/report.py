@@ -286,6 +286,13 @@ def render_markdown(analysis: "DealAnalysis") -> str:
     if analysis.empty_documents:
         parts += ["", "Documents with no extractable text (possibly scanned images):"]
         parts += [f"- `{name}`" for name in analysis.empty_documents]
+    if analysis.degraded_documents:
+        parts += [
+            "",
+            "Documents where an analysis stage failed (results incomplete for these "
+            "— review them manually or rerun):",
+        ]
+        parts += [f"- `{name}`" for name in analysis.degraded_documents]
     parts += ["", "## Limitations", "", LIMITATIONS, ""]
     if analysis.run:
         run = analysis.run
