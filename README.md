@@ -18,7 +18,8 @@ Built for the first-pass review in M&A, VC, and PE deals:
 - **Due diligence findings** — change-of-control clauses, termination rights, exclusivity, IP ownership, material liabilities, missing signatures — each with severity, a verbatim evidence excerpt, and the source file and page
 - **Mechanically verified citations** — the source file and page on every finding are stamped by code, not by the model, and every evidence quote is checked in code against the source document; a quote that cannot be matched verbatim is labelled as inference, so you never have to take a citation on trust
 - **Run record** — every report states the model, version, date, and verification counts behind it, and `deal.json` holds the full machine-readable analysis, so any figure can be explained months later
-- **Key metrics** — revenue, ARR, growth, margins, retention, runway, extracted only where explicitly stated, every value cited to its source
+- **Fast triage** — `vespera triage` screens a dataroom in minutes: the three most decisive items, a criterion-by-criterion check of your investment criteria (met / violated / unknown), what's missing from the room, and a verdict on whether a full review is worth running
+- **Key metrics** — revenue, ARR, growth, margins, retention, runway, taken only from financial-record documents (financial statements, investor updates, board minutes) and only where explicitly stated; figures in plans, marketing, or third-party material are excluded by construction, and every value is cited to its source
 - **Contradiction detection** — the same metric reported differently in two documents, conflicting claims across contracts and board minutes, referenced schedules that aren't in the dataroom
 - **AI adoption profile** — is AI evidenced in the product, operations, and engineering, or only claimed? "AI-powered" marketing with a rule-based mechanism underneath is flagged as a red flag, and the profile feeds the valuation: AI-native economics, AI-augmented operations, and AI-adoption headroom carry different margin structures and multiples
 - **Deal readiness score** — a reproducible severity-weighted score with a Strong / Balanced / Cautious reading
@@ -96,12 +97,23 @@ vespera review ./examples/sample-dataroom --thesis ./examples/thesis.md
 ### Commands
 
 ```bash
+vespera triage PATH [--thesis thesis.md]   # fast screen: is a full review worth it?
 vespera review PATH [--thesis thesis.md] [--model qwen3:8b] [--output vespera-output] [--host http://localhost:11434]
 vespera models      # show recommended + locally installed Ollama models
 vespera --version
 ```
 
 The thesis file is plain Markdown — write your criteria however you normally would (see [examples/thesis.md](examples/thesis.md)).
+
+## The workflow: triage first, then review
+
+`triage` and `review` answer different questions — run them in order.
+
+1. **`vespera triage ./dataroom --thesis thesis.md`** — minutes. Reads document summaries only and answers *"is this worth my time?"*: the three most decisive items (deal-breaker / concern / strength), a checklist of your criteria with each marked met, violated, or unknown, and the essentials missing from the room. Nothing in it is quote-verified — it is a screen, not evidence.
+2. **Your call.** If the verdict is "significant deal-breakers evident" and you agree with the reasons, stop there — you've spent minutes, not hours.
+3. **`vespera review ./dataroom --thesis thesis.md`** — only if the deal survives your look. This is the full analysis: findings with mechanically verified quotes, contradictions, risk matrix, readiness score, thesis fit, valuation, and the run record.
+
+One rule: never hand anyone the triage output as the deliverable. Triage exists to protect your time. The review — with your judgment on top — is the work product.
 
 ## Supported document types
 
