@@ -12,6 +12,8 @@ from vespera.review.models import (
     DocumentSummary,
     ExtractedMetrics,
     MultipleProposal,
+    CriteriaChecks,
+    CriterionCheck,
     ScoreRationale,
     ThesisAssessment,
     TriageItem,
@@ -31,6 +33,7 @@ class FakeProvider:
         thesis_assessment=None,
         multiple_proposal=None,
         ai_assessment=None,
+        criteria_checks=None,
     ):
         self.chunk_findings = chunk_findings or []
         self.summary = summary
@@ -39,6 +42,7 @@ class FakeProvider:
         self.thesis_assessment = thesis_assessment
         self.multiple_proposal = multiple_proposal
         self.ai_assessment = ai_assessment
+        self.criteria_checks = criteria_checks
         self.prompts: list[str] = []
 
     def generate_structured(self, prompt, schema):
@@ -47,7 +51,7 @@ class FakeProvider:
             return ChunkFindings(findings=self.chunk_findings)
         if schema is DocumentSummary:
             if self.summary is None:
-                return DocumentSummary(contract_type="unknown", signed=False)
+                return DocumentSummary(doc_kind="other", contract_type="unknown", signed=False)
             return self.summary
         if schema is CrossDocumentFindings:
             return CrossDocumentFindings(findings=self.cross_findings)
@@ -74,6 +78,10 @@ class FakeProvider:
                     )
                 ],
                 automation_leverage="Not assessable from the evidence.",
+            )
+        if schema is CriteriaChecks:
+            return self.criteria_checks or CriteriaChecks(
+                checks=[CriterionCheck(criterion="ARR scale", status="met", evidence="07")]
             )
         if schema is TriageResult:
             return TriageResult(

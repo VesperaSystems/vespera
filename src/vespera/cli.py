@@ -229,6 +229,12 @@ def triage(
         console.print("\n[bold]Missing from the dataroom:[/bold]")
         for missing in result.missing_essentials:
             console.print(f"- {missing}")
+    if outcome.criteria_checks:
+        console.print("\n[bold]Criteria check:[/bold]")
+        status_marker = {"met": "[green]met[/green]", "violated": "[red]violated[/red]",
+                         "contradicted-evidence": "[red]contradicted[/red]", "unknown": "[dim]unknown[/dim]"}
+        for check in outcome.criteria_checks:
+            console.print(f"- {check.criterion}: {status_marker.get(check.status, check.status)}")
     console.print(f"\n[bold]Screen verdict: {result.verdict}[/bold]")
     console.print(f"{result.rationale}")
     if outcome.degraded_documents:
@@ -262,6 +268,11 @@ def triage(
     if result.missing_essentials:
         lines += ["", "## Missing from the dataroom", ""]
         lines += [f"- {m}" for m in result.missing_essentials]
+    if outcome.criteria_checks:
+        lines += ["", "## Criteria check", ""]
+        lines += [
+            f"- {c.criterion}: **{c.status}** ({c.evidence})" for c in outcome.criteria_checks
+        ]
     lines += ["", f"## Screen verdict: {result.verdict}", "", result.rationale, ""]
     lines += ["## Documents screened", ""]
     lines += [f"- `{name}`" for name in outcome.documents]

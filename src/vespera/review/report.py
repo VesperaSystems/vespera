@@ -70,9 +70,19 @@ def _score_section(analysis: "DealAnalysis") -> list[str]:
 
 def _metrics_section(analysis: "DealAnalysis") -> list[str]:
     if not analysis.metrics:
-        return ["## Key Metrics", "", "No explicitly stated financial metrics were found.", ""]
+        return [
+            "## Key Metrics",
+            "",
+            "No metrics found in financial-record documents (financial statements, "
+            "investor updates, board minutes). Figures in plans, marketing, or "
+            "third-party material are deliberately excluded from metrics.",
+            "",
+        ]
     parts = [
         "## Key Metrics",
+        "",
+        "*From financial-record documents only; figures in plans or marketing "
+        "material are excluded.*",
         "",
         "| Metric | Value | Period | Source | Quote |",
         "| --- | --- | --- | --- | --- |",

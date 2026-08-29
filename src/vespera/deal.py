@@ -23,6 +23,7 @@ from vespera.review.aggregator import aggregate_findings
 from vespera.review.ai_adoption import ai_claim_findings, ai_excerpt, assess_ai_adoption
 from vespera.review.analyzer import analyze_document, cross_document_findings
 from vespera.review.metrics import (
+    METRIC_SOURCE_KINDS,
     dedupe_metrics,
     extract_metrics,
     has_financial_content,
@@ -115,7 +116,12 @@ def analyze_dataroom(
                 summaries[relative_name] = summary
         except Exception:
             degraded.append(f"{relative_name} (findings extraction failed)")
-        if has_financial_content(document):
+        summary = summaries.get(relative_name)
+        if (
+            summary is not None
+            and summary.doc_kind in METRIC_SOURCE_KINDS
+            and has_financial_content(document)
+        ):
             notify(f"Extracting metrics from {relative_name}")
             try:
                 metrics.extend(extract_metrics(document, provider, config, relative_name))

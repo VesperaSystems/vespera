@@ -71,7 +71,16 @@ def test_analyze_dataroom_end_to_end(tmp_path: Path):
     thesis = tmp_path / "thesis.md"
     thesis.write_text("We invest in ARR > £5m businesses.")
 
-    provider = MetricsByDocProvider(chunk_findings=[FINDING])
+    from vespera.review.models import DocumentSummary
+
+    provider = MetricsByDocProvider(
+        chunk_findings=[FINDING],
+        summary=DocumentSummary(
+            doc_kind="financial statements or management accounts",
+            contract_type="accounts",
+            signed=True,
+        ),
+    )
     analysis = analyze_dataroom(
         room,
         thesis_path=thesis,
@@ -92,6 +101,32 @@ def test_analyze_dataroom_end_to_end(tmp_path: Path):
     assert analysis.thesis_fit is not None
     assert analysis.valuation is not None
     assert analysis.valuation.basis_metric == "arr"
+
+
+def test_metrics_not_extracted_from_non_financial_documents(tmp_path: Path):
+    from vespera.review.models import DocumentSummary, ExtractedMetrics
+
+    room = tmp_path / "room"
+    room.mkdir()
+    (room / "gtm-plan.txt").write_text("Our ARR target is $500k with revenue of $72k per deal.")
+
+    class CountingProvider(FakeProvider):
+        metrics_calls = 0
+
+        def generate_structured(self, prompt, schema):
+            if schema is ExtractedMetrics:
+                CountingProvider.metrics_calls += 1
+            return super().generate_structured(prompt, schema)
+
+    provider = CountingProvider(
+        summary=DocumentSummary(
+            doc_kind="marketing, GTM or sales", contract_type="GTM plan", signed=False
+        )
+    )
+    analysis = analyze_dataroom(room, provider=provider, deep_provider=provider)
+    assert CountingProvider.metrics_calls == 0  # gate blocked the marketing document
+    assert analysis.metrics == []
+    assert analysis.valuation is None
 
 
 def test_analyze_dataroom_without_thesis(tmp_path: Path):

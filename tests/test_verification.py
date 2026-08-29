@@ -126,7 +126,15 @@ def test_degraded_document_does_not_abort_run(tmp_path):
                 raise OllamaError("model returned output that failed validation twice")
             return super().generate_structured(prompt, schema)
 
-    provider = FailingMetricsProvider()
+    from vespera.review.models import DocumentSummary
+
+    provider = FailingMetricsProvider(
+        summary=DocumentSummary(
+            doc_kind="financial statements or management accounts",
+            contract_type="accounts",
+            signed=True,
+        )
+    )
     analysis = analyze_dataroom(room, provider=provider, deep_provider=provider)
     assert len(analysis.documents) == 2  # the run completed
     assert analysis.degraded_documents == ["bad-metrics.txt (metrics extraction failed)"]

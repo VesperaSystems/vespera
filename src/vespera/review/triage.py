@@ -14,7 +14,13 @@ from vespera.config import ReviewConfig
 from vespera.documents.loader import discover_documents, load_document
 from vespera.llm.base import LLMProvider
 from vespera.review import prompts
-from vespera.review.models import DocumentSummary, TriageResult
+from vespera.review.models import (
+    CriteriaChecks,
+    CriterionCheck,
+    DocumentSummary,
+    TriageItem,
+    TriageResult,
+)
 
 TRIAGE_PROMPT = """\
 {role}
@@ -28,6 +34,12 @@ most decisive overall, whatever their direction.
 
 Rules:
 - Only use what the summaries support; name the source document for each item.
+- FIRST check for kill-criteria: if the investor's criteria name conditions under
+  which they pass on a deal, test each one against the summaries. A violated
+  pass-condition, or two documents contradicting each other on one, is always more
+  decisive than a strength and MUST take one of the three slots.
+- Do not fill all three slots with strengths unless nothing negative or contradictory
+  exists in the summaries at all.
 - "missing_essentials": essential documents or facts a reviewer would expect and the
   dataroom does not contain (e.g. historical financials, signed key contracts).
 - The verdict is about whether a FULL REVIEW is warranted — never about whether to
@@ -47,12 +59,86 @@ The investor's criteria, for judging what is decisive:
 """
 
 
+CRITERIA_CHECK_PROMPT = """\
+{role}
+
+Below are an investor's criteria and summaries of every document in a dataroom.
+Go through the criteria one by one and check each against the summaries. Include
+every criterion — especially any conditions under which the investor passes on a
+deal ("we pass on...", "we avoid...", deal-breakers).
+
+Statuses:
+- "met": the summaries support the criterion.
+- "violated": the summaries contradict it, or a stated pass-condition applies.
+- "contradicted-evidence": two documents disagree about the fact the criterion
+  depends on.
+- "unknown": the summaries give no evidence either way.
+
+--- INVESTMENT CRITERIA ---
+{thesis}
+--- END CRITERIA ---
+
+--- DOCUMENT SUMMARIES ---
+{summaries}
+--- END SUMMARIES ---
+"""
+
+
+def apply_criteria_checks(result: TriageResult, checks: list[CriterionCheck]) -> TriageResult:
+    """A violated pass-condition must occupy a triage slot; enforced in code because
+    small models bury kill-criteria under strengths."""
+    problems = [c for c in checks if c.status in ("violated", "contradicted-evidence")]
+    if not problems:
+        return result
+    covered = " ".join(f"{i.title} {i.why}".lower() for i in result.items)
+    missing = [
+        c for c in problems
+        if not any(word in covered for word in c.criterion.lower().split() if len(word) > 5)
+    ]
+    items = list(result.items)
+    for check in missing:
+        strength_positions = [i for i, item in enumerate(items) if item.direction == "strength"]
+        if not strength_positions:
+            break
+        label = "deal-breaker" if check.status == "violated" else "concern"
+        items[strength_positions[-1]] = TriageItem(
+            title=f"Criteria check failed: {check.criterion}",
+            direction=label,
+            why=(
+                "The investor's criteria treat this as a condition to pass on, and the "
+                "document summaries indicate it applies."
+                if check.status == "violated"
+                else "Documents disagree about the fact this criterion depends on."
+            ),
+            source=check.evidence,
+        )
+    if any(item.direction == "deal-breaker" for item in items):
+        verdict = "significant deal-breakers evident"
+        rationale = (
+            "One or more of the investor's stated pass-conditions appears to apply; "
+            "see the criteria check."
+        )
+    elif any(item.direction == "concern" for item in items):
+        verdict = "resolve the flagged items before a full review"
+        rationale = result.rationale
+    else:
+        verdict = result.verdict
+        rationale = result.rationale
+    return TriageResult(
+        items=items,
+        missing_essentials=result.missing_essentials,
+        verdict=verdict,
+        rationale=rationale,
+    )
+
+
 @dataclass
 class TriageOutcome:
     result: TriageResult
     documents: list[str]
     empty_documents: list[str]
     degraded_documents: list[str]
+    criteria_checks: list[CriterionCheck] | None = None
 
 
 def triage_dataroom(
@@ -102,14 +188,37 @@ def triage_dataroom(
     if thesis_path is not None:
         thesis_block = THESIS_BLOCK.format(thesis=thesis_path.read_text(encoding="utf-8")[:6000])
 
+    summaries_text = "\n".join(summary_lines) or "- no readable documents"
     result = provider.generate_structured(
         TRIAGE_PROMPT.format(
             role=prompts.ANALYST_ROLE,
             thesis_block=thesis_block,
-            summaries="\n".join(summary_lines) or "- no readable documents",
+            summaries=summaries_text,
         ),
         TriageResult,
     )
+
+    checks: list[CriterionCheck] | None = None
+    if thesis_path is not None:
+        notify("Checking investor criteria")
+        try:
+            checked = provider.generate_structured(
+                CRITERIA_CHECK_PROMPT.format(
+                    role=prompts.ANALYST_ROLE,
+                    thesis=thesis_path.read_text(encoding="utf-8")[:6000],
+                    summaries=summaries_text,
+                ),
+                CriteriaChecks,
+            )
+            checks = checked.checks
+            result = apply_criteria_checks(result, checks)
+        except Exception:
+            degraded.append("(criteria check failed)")
+
     return TriageOutcome(
-        result=result, documents=reviewed, empty_documents=empty, degraded_documents=degraded
+        result=result,
+        documents=reviewed,
+        empty_documents=empty,
+        degraded_documents=degraded,
+        criteria_checks=checks,
     )

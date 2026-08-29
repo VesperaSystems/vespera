@@ -91,8 +91,8 @@ def test_cross_document_findings_filters_categories():
     ]
     provider = FakeProvider(cross_findings=cross)
     summaries = {
-        "a.pdf": DocumentSummary(contract_type="MSA", signed=True),
-        "b.pdf": DocumentSummary(contract_type="NDA", signed=True),
+        "a.pdf": DocumentSummary(doc_kind="contract or agreement", contract_type="MSA", signed=True),
+        "b.pdf": DocumentSummary(doc_kind="contract or agreement", contract_type="NDA", signed=True),
     }
     result = cross_document_findings(summaries, provider, ReviewConfig())
     assert len(result) == 2
@@ -112,8 +112,8 @@ def test_cross_document_drops_non_findings():
     )
     provider = FakeProvider(cross_findings=[non_finding])
     summaries = {
-        "a.pdf": DocumentSummary(contract_type="MSA", signed=True),
-        "b.pdf": DocumentSummary(contract_type="NDA", signed=True),
+        "a.pdf": DocumentSummary(doc_kind="contract or agreement", contract_type="MSA", signed=True),
+        "b.pdf": DocumentSummary(doc_kind="contract or agreement", contract_type="NDA", signed=True),
     }
     assert cross_document_findings(summaries, provider, ReviewConfig()) == []
 
@@ -121,7 +121,7 @@ def test_cross_document_drops_non_findings():
 def test_cross_document_skips_single_document():
     provider = FakeProvider()
     result = cross_document_findings(
-        {"only.pdf": DocumentSummary(contract_type="NDA", signed=True)},
+        {"only.pdf": DocumentSummary(doc_kind="contract or agreement", contract_type="NDA", signed=True)},
         provider,
         ReviewConfig(),
     )

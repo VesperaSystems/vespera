@@ -71,9 +71,27 @@ class ChunkFindings(BaseModel):
     )
 
 
+DocKind = Literal[
+    "financial statements or management accounts",
+    "investor update",
+    "board minutes",
+    "contract or agreement",
+    "marketing, GTM or sales",
+    "customer testimonials",
+    "competitor or market analysis",
+    "technical documentation",
+    "team or HR",
+    "risk or internal analysis",
+    "other",
+]
+
+
 class DocumentSummary(BaseModel):
     """One-line facts per document, used for the cross-document pass."""
 
+    doc_kind: DocKind = Field(
+        description="What kind of document this is — judge by content, not filename"
+    )
     contract_type: str = Field(description="e.g. 'Master Services Agreement', or 'unknown'")
     parties: list[str] = Field(default_factory=list)
     key_dates: list[str] = Field(default_factory=list)
@@ -231,6 +249,18 @@ class AIProfile(BaseModel):
     product_ai: str
     aspects: list[AIAspectAssessment]
     automation_leverage: str
+
+
+class CriterionCheck(BaseModel):
+    criterion: str
+    status: Literal["met", "violated", "contradicted-evidence", "unknown"]
+    evidence: str = Field(description="Which document(s) support this status; 'none' for unknown")
+
+
+class CriteriaChecks(BaseModel):
+    """One check per investor criterion — never empty when criteria were given."""
+
+    checks: list[CriterionCheck] = Field(min_length=1)
 
 
 class TriageItem(BaseModel):

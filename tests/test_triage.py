@@ -56,6 +56,59 @@ def test_triage_survives_failed_summary(tmp_path):
     assert len(outcome.result.items) == 3
 
 
+def test_violated_criterion_takes_a_slot():
+    from vespera.review.models import CriterionCheck
+    from vespera.review.triage import apply_criteria_checks
+
+    all_strengths = TriageResult(
+        items=[
+            TriageItem(title="Growth", direction="strength", why="x", source="07"),
+            TriageItem(title="Margin", direction="strength", why="x", source="07"),
+            TriageItem(title="Retention", direction="strength", why="x", source="07"),
+        ],
+        verdict="full review looks worthwhile",
+        rationale="all good",
+    )
+    checks = [
+        CriterionCheck(criterion="ARR scale", status="met", evidence="07"),
+        CriterionCheck(
+            criterion="Clean IP ownership including contractors",
+            status="violated",
+            evidence="03 vs 05",
+        ),
+    ]
+    result = apply_criteria_checks(all_strengths, checks)
+    breakers = [i for i in result.items if i.direction == "deal-breaker"]
+    assert len(breakers) == 1
+    assert "Clean IP" in breakers[0].title
+    assert result.verdict == "significant deal-breakers evident"
+
+
+def test_already_covered_violation_not_duplicated():
+    from vespera.review.models import CriterionCheck
+    from vespera.review.triage import apply_criteria_checks
+
+    covering = TriageResult(
+        items=[
+            TriageItem(
+                title="Disputed ownership of firmware intellectual property",
+                direction="deal-breaker",
+                why="x",
+                source="03",
+            ),
+            TriageItem(title="Margin", direction="strength", why="x", source="07"),
+            TriageItem(title="Retention", direction="strength", why="x", source="07"),
+        ],
+        verdict="significant deal-breakers evident",
+        rationale="ip",
+    )
+    checks = [
+        CriterionCheck(criterion="Clean intellectual property", status="violated", evidence="03")
+    ]
+    result = apply_criteria_checks(covering, checks)
+    assert sum(1 for i in result.items if i.direction == "deal-breaker") == 1
+
+
 def test_triage_result_requires_exactly_three_items():
     item = TriageItem(title="x", direction="concern", why="y", source="z")
     with pytest.raises(ValidationError):

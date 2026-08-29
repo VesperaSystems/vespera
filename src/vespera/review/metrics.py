@@ -8,6 +8,14 @@ from vespera.llm.base import LLMProvider
 from vespera.review.models import ExtractedMetrics, Finding, KeyMetric
 from vespera.review.prompts import ANALYST_ROLE
 
+# company metrics may only come from documents that record them, never from documents
+# that merely mention numbers (plans, testimonials, competitor analyses)
+METRIC_SOURCE_KINDS = {
+    "financial statements or management accounts",
+    "investor update",
+    "board minutes",
+}
+
 # cheap gate so we only spend an LLM call on documents with financial content
 FINANCIAL_HINT = re.compile(
     r"revenue|\bARR\b|\bMRR\b|EBITDA|gross margin|net revenue retention|\bNRR\b"

@@ -47,6 +47,9 @@ SUMMARY_PROMPT = """\
 
 Summarise the key facts of this document for cross-referencing against other documents
 in the same dataroom. Only state what the text supports; use "unknown" when unclear.
+Classify "doc_kind" by what the document actually is: financial statements are actual
+historical accounts, not plans; a GTM or sales plan is "marketing, GTM or sales" even
+if it contains revenue targets.
 Work through the ENTIRE document from start to finish — cover every numbered clause,
 section, or agenda item. In "key_facts", include every monetary amount or commitment,
 every claim about who owns an asset or intellectual property, every key date, and any
